@@ -1,0 +1,40 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ambientes virtuais (Virtual environments)
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Banco de dados local e backups
+*.db
+*.sqlite
+*.sqlite3
+oneworld.db
+backups/
+
+# Streamlit (configurações locais e segredos)
+.streamlit/secrets.toml
+
+# Logs e arquivos temporários
+*.log
+*.tmp
+*.temp
+
+# Arquivos do sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores e IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
