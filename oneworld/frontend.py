@@ -1,5 +1,6 @@
 """Interface (Streamlit) do OneWorld: telas, formulários e navegação.
-Só desenha e coleta ações do usuário; regras ficam em backend.py e SQL em database.py."""
+Só desenha e coleta ações do usuário; BI fica nos módulos analíticos,
+demais regras em backend.py e SQL em database.py."""
 import math
 from datetime import date
 
@@ -234,47 +235,10 @@ def importar_planilha(destino_fixo=None, ch="imp"):
 
 # ── Páginas ──
 def pagina_dashboard():
-    cfg = C()
-    titulo("Dashboard", "Visão geral dos dados e indicadores")
-    e, cv = dados("eventos"), dados("convidados")
-    f1, f2 = st.columns(2)
-    mes = f1.selectbox("Período", ["Todos"] + bk.meses_disponiveis(e), key="dash_mes",
-                       format_func=lambda m: m if m == "Todos" else f"{m[5:]}/{m[:4]}")
-    stat = f2.multiselect("Status", STATUS_EVENTO, key="dash_status")
-    f = bk.filtrar_eventos(e, mes, stat)
+    from .frontend_bi import mostrar_dashboard
 
-    conf = int((cv["confirmacao"] == "Confirmado").sum()) if not cv.empty else 0
-    a, b, c, d, x = st.columns(5)
-    a.metric("Eventos", len(f))
-    b.metric("Convidados previstos", int(f["convidados"].sum()))
-    c.metric("Receita prevista", moeda(f["valor"].sum()))
-    d.metric("Pendências", int(f["status"].isin(["Pendente", "Em planejamento"]).sum()))
-    x.metric("Convidados confirmados", f"{conf} de {len(cv)}")
-    st.caption("Receita prevista = valores cadastrados nas reservas; não representa pagamentos recebidos.")
-    st.divider()
-
-    g1, g2, g3 = st.columns([2, 2, 1.3])
-    if not f.empty:
-        t = f.assign(mês=pd.to_datetime(f["data"]).dt.strftime("%Y-%m"))
-        with g1:
-            st.subheader("Receita prevista por mês")
-            st.bar_chart(t.groupby("mês")["valor"].sum(), color=cfg["cor"])
-        with g2:
-            st.subheader("Eventos por status")
-            st.bar_chart(f.groupby("status").size(), color=cfg["cor2"])
-    else:
-        g1.info("Nenhum evento para os filtros escolhidos.")
-    with g3:
-        st.subheader("Notificações")
-        if cfg["lembretes"]:
-            for msg in bk.lembretes(e):
-                st.warning(msg)
-        for n in st.session_state.notificacoes[:5]:
-            st.info(n)
-
-    st.subheader("Próximos eventos")
-    prox = f[pd.to_datetime(f["data"]).dt.date >= date.today()] if not f.empty else f
-    mostrar_tabela(formatar((prox if not prox.empty else f).drop(columns=["id"]), "eventos"), "dash")
+    titulo("Dashboard", "Análise configurável de conjuntos de dados")
+    mostrar_dashboard(C()["cor"])
 
 
 def pagina_eventos():
@@ -572,8 +536,9 @@ def main():
     sidebar()
     pagina = st.session_state.pagina
     if st.session_state.get("_ultima_pagina") not in (None, pagina) and not cfg["lembrar_filtros"]:
-        for k in FILTROS:
-            st.session_state.pop(k, None)
+        for k in list(st.session_state):
+            if k in FILTROS or k.startswith("bi_cfg_filtro_"):
+                st.session_state.pop(k, None)
     st.session_state["_ultima_pagina"] = pagina
 
     if pagina == "Dashboard" and cfg["auto_refresh"]:

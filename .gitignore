@@ -3,7 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Ambientes virtuais (Virtual environments)
+# Virtual environments
 .venv/
 venv/
 ENV/
@@ -11,27 +11,30 @@ env/
 env.bak/
 venv.bak/
 
-# Banco de dados local e backups
+# Local database and backups
 *.db
 *.sqlite
 *.sqlite3
 oneworld.db
 backups/
 
-# Streamlit (configurações locais e segredos)
+# Streamlit and local secrets
 .streamlit/secrets.toml
+.env
+.env.*
+!.env.example
 
-# Logs e arquivos temporários
+# Logs and temporary files
 *.log
 *.tmp
 *.temp
 
-# Arquivos do sistema operacional
+# Operating system files
 .DS_Store
 Thumbs.db
 desktop.ini
 
-# Editores e IDEs
+# Editors and IDEs
 .vscode/
 .idea/
 *.sublime-project

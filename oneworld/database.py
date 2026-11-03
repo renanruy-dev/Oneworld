@@ -2,6 +2,7 @@
 import json
 import sqlite3
 from datetime import datetime
+from typing import cast
 
 import pandas as pd
 
@@ -69,7 +70,7 @@ def init_db():
 # ── Configurações persistidas ──
 def cfg_ler(chave, padrao):
     df = consulta("SELECT valor FROM config WHERE chave=?", (chave,))
-    return json.loads(df.iloc[0, 0]) if not df.empty else padrao
+    return json.loads(cast(str, df.iloc[0, 0])) if not df.empty else padrao
 
 
 def cfg_gravar(chave, valor):
@@ -118,7 +119,7 @@ def renomear_evento_nos_convidados(novo, antigo):
 
 def contar_convidados_do_evento(nome_evento):
     df = consulta("SELECT COUNT(*) AS n FROM convidados WHERE evento=?", (nome_evento,))
-    return int(df.iloc[0, 0])
+    return int(cast(int, df.iloc[0, 0]))
 
 
 # ── Histórico de arquivos importados ──
