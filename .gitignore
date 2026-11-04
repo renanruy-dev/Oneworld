@@ -38,3 +38,6 @@ desktop.ini
 *.sublime-workspace
 *.swp
 *.swo
+*.lnk
+*.pdf
+oneworld_modelo_base.py

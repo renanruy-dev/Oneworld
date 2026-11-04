@@ -1,5 +1,5 @@
 """Regras de negócio do OneWorld: formatação, importação de planilhas, validação,
-IA simulada, exportação em Markdown e lembretes. Não depende de Streamlit nem de SQL —
+IA simulada, exportação em Markdown e lembretes. Não depende de UI nem de SQL —
 recebe DataFrames/valores e devolve DataFrames/valores."""
 import json
 import re
@@ -130,14 +130,18 @@ def lembretes(e, hoje=None, dias=7):
 
 # ── Importação de planilhas ──
 def ler_arquivo(arq):
-    """Lê CSV (separador detectado), XLSX ou JSON de um arquivo enviado."""
-    nome = arq.name.lower()
+    """Lê CSV (separador detectado), XLSX ou JSON de um caminho (Path/str) ou objeto arquivo."""
+    nome = (arq.name if hasattr(arq, "name") else str(arq)).lower()
     if nome.endswith(".csv"):
         df = pd.read_csv(arq, sep=None, engine="python", encoding="utf-8-sig")
     elif nome.endswith(".xlsx"):
         df = pd.read_excel(arq)
     else:
-        dados = json.load(arq)
+        if hasattr(arq, "read"):
+            dados = json.load(arq)
+        else:
+            with open(arq, encoding="utf-8-sig") as f:
+                dados = json.load(f)
         if isinstance(dados, dict):
             dados = next((v for v in dados.values() if isinstance(v, list)), [dados])
         df = pd.json_normalize(dados)
