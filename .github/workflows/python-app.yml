@@ -1,5 +1,7 @@
-# This workflow will install Python dependencies, run tests and lint with a single version of Python
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+# Pipeline de CI (GitHub Actions) do OneWorld
+# Executa lint com flake8 e testes automatizados com pytest em ambiente Ubuntu
+# Atualizado no commit 8f33301 para configurar PYTHONPATH e actions/setup-python@v5
+# resolvendo falhas de build anteriores dos commits 6815494, 48dbcce e f226173
 
 name: Python application
 
@@ -20,7 +22,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python 3.10
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: "3.10"
     - name: Install dependencies
@@ -35,5 +37,9 @@ jobs:
         # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
+      # Configuração de PYTHONPATH para que os testes em tests/ localizem o pacote oneworld
+      env:
+        PYTHONPATH: .
       run: |
-        pytest
+        python -m pytest
+
