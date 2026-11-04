@@ -28,7 +28,7 @@ def consulta(sql, params=()):
 
 
 def init_db():
-    """Cria as tabelas (se não existirem) e insere os dados demonstrativos na primeira execução."""
+    """Cria as tabelas do banco de dados (se não existirem)."""
     con = sqlite3.connect(DB_PATH)
     try:
         con.executescript("""
@@ -49,18 +49,6 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT, pergunta TEXT, resposta TEXT);
         CREATE TABLE IF NOT EXISTS config(chave TEXT PRIMARY KEY, valor TEXT);
         """)
-        if not con.execute("SELECT 1 FROM config WHERE chave='seed'").fetchone():
-            con.executemany(
-                "INSERT INTO eventos(data,cliente,local,convidados,valor,status) VALUES(?,?,?,?,?,?)",
-                [("2026-10-10", "Cliente / Operação 01", "Unidade Matriz", 120, 15000.0, "Confirmado"),
-                 ("2026-10-18", "Contrato Corporativo B", "Filial Centro", 80, 9200.0, "Em planejamento"),
-                 ("2026-10-25", "Operação Comercial C", "Unidade Sul", 200, 24000.0, "Confirmado")])
-            con.executemany(
-                "INSERT INTO convidados(evento,nome,mesa,acompanhantes,contato,restricao,confirmacao)"
-                " VALUES(?,?,?,?,?,?,?)",
-                [("Cliente / Operação 01", "Contato Principal A", "GRP-01", 1, "contato@empresa.com", "—", "Confirmado"),
-                 ("Cliente / Operação 01", "Representante B", "GRP-01", 2, "(11) 99999-0000", "Prioridade alta", "Pendente")])
-            con.execute("INSERT INTO config VALUES('seed','1')")
         con.commit()
     finally:
         con.close()

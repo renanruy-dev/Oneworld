@@ -661,7 +661,7 @@ class OneWorldWindow(QMainWindow):
             cfg["rotulos_custom"] = {}
         self.cfg: dict = cfg
         self.campos_personalizados: list[str] = db.cfg_ler("campos_personalizados", [])
-        self.notificacoes: list[str] = ["Sistema inicializado.", "Dados carregados do SQLite."]
+        self.notificacoes: list[str] = []
         self.pagina_atual: str = self.cfg.get("pagina_inicial", "Dashboard")
         if self.pagina_atual not in PAGINAS:
             self.pagina_atual = "Dashboard"
@@ -938,14 +938,24 @@ class OneWorldWindow(QMainWindow):
             col_g2.addWidget(self._subtitulo(v["grafico_status"]))
             col_g2.addWidget(BarChartWidget(f.groupby("status").size(), self.cfg["cor2"], self.cfg, False))
         else:
-            col_g1.addWidget(AlertBox("Nenhum registro para os filtros escolhidos.", "info"))
+            col_g1.addWidget(self._subtitulo(f"{v['metric_valor']} por mês"))
+            col_g1.addWidget(AlertBox("Nenhum dado registrado para exibir no gráfico.", "info"))
+            col_g2.addWidget(self._subtitulo(v["grafico_status"]))
+            col_g2.addWidget(AlertBox("Nenhum dado registrado para exibir no gráfico.", "info"))
 
         col_g3.addWidget(self._subtitulo("Notificações"))
+        tem_notif = False
         if self.cfg.get("lembretes", True):
             for msg in bk.lembretes(e):
                 col_g3.addWidget(AlertBox(msg, "warning"))
+                tem_notif = True
         for n in self.notificacoes[:5]:
             col_g3.addWidget(AlertBox(n, "info"))
+            tem_notif = True
+        if not tem_notif:
+            lbl_sem = QLabel("Nenhuma notificação ou pendência no momento.")
+            lbl_sem.setObjectName("Caption")
+            col_g3.addWidget(lbl_sem)
         col_g3.addStretch(1)
 
         linha_g.addLayout(col_g1, stretch=20)

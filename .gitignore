@@ -18,9 +18,6 @@ venv.bak/
 oneworld.db
 backups/
 
-# Streamlit (configurações locais e segredos)
-.streamlit/secrets.toml
-
 # Logs e arquivos temporários
 *.log
 *.tmp
@@ -30,6 +27,13 @@ backups/
 .DS_Store
 Thumbs.db
 desktop.ini
+*.lnk
+
+# Documentos locais e temporários
+*.pdf
+*.docx
+~$*
+oneworld_modelo_base.py
 
 # Editores e IDEs
 .vscode/
@@ -38,8 +42,3 @@ desktop.ini
 *.sublime-workspace
 *.swp
 *.swo
-*.lnk
-*.pdf
-oneworld_modelo_base.py
-*.docx
-~$*
