@@ -46,18 +46,21 @@ from . import database as db
 from .config import (
     BACKUP_DIR,
     CAMPOS,
-    CAMPOS_DESTINO,
     FILTROS,
     LOGO_PADRAO,
     NAO_USAR,
     OBRIGATORIOS,
     PADROES,
     PAGINAS,
+    PERFIL_PADRAO,
+    PERFIS_NEGOCIO,
     ROXO,
     STATUS_CONV,
     STATUS_CORES,
     STATUS_EVENTO,
     VERDE,
+    obter_vocabulario,
+    rotulo_pagina,
 )
 from .tema import gerar_qss, metricas_layout, paleta_atual
 
@@ -88,7 +91,7 @@ class Divider(QFrame):
 
 
 class AlertBox(QFrame):
-    """Caixa de aviso estilizada equivalente a st.info / st.success / st.warning / st.error."""
+    """Caixa de aviso estilizada."""
 
     def __init__(self, texto: str, tipo: str = "info"):
         super().__init__()
@@ -114,7 +117,7 @@ class AlertBox(QFrame):
 
 
 class MetricCard(QFrame):
-    """Cartão de indicador equivalente ao st.metric com barra lateral verde."""
+    """Cartão de indicador com barra lateral verde."""
 
     def __init__(self, rotulo: str, valor: str | int):
         super().__init__()
@@ -135,7 +138,7 @@ class MetricCard(QFrame):
 
 
 class ExpanderWidget(QFrame):
-    """Componente recolhível leve equivalente ao st.expander."""
+    """Componente recolhível leve."""
 
     def __init__(self, titulo_txt: str, aberto: bool = False):
         super().__init__()
@@ -173,7 +176,7 @@ class ExpanderWidget(QFrame):
 
 
 class MultiSelectChips(QWidget):
-    """Seletor múltiplo leve usando botões de alternância (chips), equivalente ao st.multiselect."""
+    """Seletor múltiplo leve usando botões de alternância (chips)."""
 
     changed = pyqtSignal(list)
 
@@ -203,16 +206,14 @@ class MultiSelectChips(QWidget):
         self._estilizar()
 
     def _estilizar(self):
-        for op, btn in self._botoes.items():
+        for _, btn in self._botoes.items():
             if btn.isChecked():
                 btn.setStyleSheet(
                     f"background-color: {self._cor}; color: #FFFFFF; border: 1px solid {self._cor}; "
                     "border-radius: 14px; padding: 4px 12px; font-weight: 600;"
                 )
             else:
-                btn.setStyleSheet(
-                    "border-radius: 14px; padding: 4px 12px;"
-                )
+                btn.setStyleSheet("border-radius: 14px; padding: 4px 12px;")
 
     def _ao_alternar(self, opcao: str, marcado: bool):
         if marcado and opcao not in self._selecionados:
@@ -263,7 +264,6 @@ class BarChartWidget(QFrame):
         if max_v <= 0:
             max_v = 1.0
 
-        # Linhas de grade horizontais
         fonte_peq = QFont("Segoe UI", 8)
         p.setFont(fonte_peq)
         for i in range(5):
@@ -286,7 +286,6 @@ class BarChartWidget(QFrame):
                 txt_eixo,
             )
 
-        # Barras
         n = len(self._dados)
         passo = area_w / n
         larg_barra = min(56.0, max(16.0, passo * 0.58))
@@ -300,7 +299,6 @@ class BarChartWidget(QFrame):
             caminho.addRoundedRect(QRectF(x, y, larg_barra, max(3.0, alt_barra)), 5, 5)
             p.fillPath(caminho, self._cor)
 
-            # Valor no topo da barra
             txt_val = bk.moeda(valor, self._cfg) if self._moeda else str(int(valor) if valor == int(valor) else valor)
             p.setPen(c_texto)
             p.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
@@ -310,7 +308,6 @@ class BarChartWidget(QFrame):
                 txt_val,
             )
 
-            # Rótulo do eixo X
             p.setPen(c_muted)
             p.setFont(fonte_peq)
             p.drawText(
@@ -323,13 +320,13 @@ class BarChartWidget(QFrame):
 
 
 class PaginatedTableWidget(QWidget):
-    """Tabela paginada com estilização de células de Status/Confirmação."""
+    """Tabela paginada com estilização de células de Status/Situação/Confirmação."""
 
     def __init__(
         self,
         df: pd.DataFrame,
         linhas_por_pagina: int = 10,
-        status_cols: tuple[str, ...] = ("Status", "Confirmação"),
+        status_cols: tuple[str, ...] = ("Status", "Confirmação", "Situação"),
         pagina_inicial: int = 1,
         ao_mudar_pagina=None,
     ):
@@ -403,7 +400,7 @@ class PaginatedTableWidget(QWidget):
                 val = "" if pd.isna(row.iloc[c_idx]) else str(row.iloc[c_idx])
                 item = QTableWidgetItem(val)
                 item.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
-                if col_name in self._status_cols and val in STATUS_CORES:
+                if (col_name in self._status_cols or val in STATUS_CORES) and val in STATUS_CORES:
                     fundo, texto_cor = STATUS_CORES[val]
                     item.setBackground(QColor(fundo))
                     item.setForeground(QColor(texto_cor))
@@ -434,7 +431,6 @@ class ImportarPlanilhaWidget(QWidget):
         self.lay.setContentsMargins(0, 0, 0, 0)
         self.lay.setSpacing(12)
 
-        # Barra de seleção de arquivo
         barra_arq = QHBoxLayout()
         btn_up = QPushButton("Selecionar arquivo (CSV, XLSX ou JSON)...")
         btn_up.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -496,6 +492,7 @@ class ImportarPlanilhaWidget(QWidget):
 
     def _renderizar_fluxo(self):
         self._limpar_layout(self.lay_din)
+        v = self.janela.vocab()
 
         erro_leitura = self.janela.estado.get(f"{self.chave}_erro")
         if erro_leitura:
@@ -524,8 +521,8 @@ class ImportarPlanilhaWidget(QWidget):
             box_dest = QHBoxLayout()
             box_dest.addWidget(QLabel("<b>Destino dos dados:</b>"))
             grp = QButtonGroup(self.area_dinamica)
-            rb_ev = QRadioButton("Eventos")
-            rb_cv = QRadioButton("Convidados")
+            rb_ev = QRadioButton(v["ent1_plural"])
+            rb_cv = QRadioButton(v["ent2_plural"])
             rb_ev.setChecked(self.destino_atual == "eventos")
             rb_cv.setChecked(self.destino_atual == "convidados")
             grp.addButton(rb_ev)
@@ -540,14 +537,15 @@ class ImportarPlanilhaWidget(QWidget):
         lbl_map = QLabel("<b>Mapeamento de colunas</b> — sugerido automaticamente por nome; ajuste se precisar")
         self.lay_din.addWidget(lbl_map)
 
-        sug = bk.sugerir(list(data.columns), self.destino_atual)
+        sug = bk.sugerir(list(data.columns), self.destino_atual, self.janela.cfg)
         opcoes = [NAO_USAR] + list(data.columns)
         grade = QGridLayout()
         grade.setHorizontalSpacing(16)
         grade.setVerticalSpacing(10)
 
+        campos_dest = v["campos_destino"][self.destino_atual]
         self._combos_mapa: dict[str, QComboBox] = {}
-        for i, (campo, rotulo) in enumerate(CAMPOS_DESTINO[self.destino_atual].items()):
+        for i, (campo, rotulo) in enumerate(campos_dest.items()):
             padrao = sug.get(campo)
             obrig = " *" if campo in OBRIGATORIOS[self.destino_atual] else ""
             celula = QWidget()
@@ -583,12 +581,14 @@ class ImportarPlanilhaWidget(QWidget):
         self._limpar_layout(self.lay_val)
         if self.df_lido is None:
             return
+        v = self.janela.vocab()
+        campos_dest = v["campos_destino"][self.destino_atual]
 
         mapa = {
             campo: (None if cb.currentText() == NAO_USAR else cb.currentText())
             for campo, cb in self._combos_mapa.items()
         }
-        faltando = [CAMPOS_DESTINO[self.destino_atual][c] for c in OBRIGATORIOS[self.destino_atual] if not mapa.get(c)]
+        faltando = [campos_dest[c] for c in OBRIGATORIOS[self.destino_atual] if not mapa.get(c)]
         if faltando:
             self.lay_val.addWidget(AlertBox("Mapeie os campos obrigatórios: " + ", ".join(faltando), "error"))
             return
@@ -603,7 +603,7 @@ class ImportarPlanilhaWidget(QWidget):
         self.lay_val.addLayout(linha_m)
 
         if res["padrao"]:
-            cap = QLabel(f"{res['padrao']} linha(s) com status/confirmação não reconhecido receberam o valor padrão.")
+            cap = QLabel(f"{res['padrao']} linha(s) com status/situação não reconhecido receberam o valor padrão.")
             cap.setObjectName("Caption")
             self.lay_val.addWidget(cap)
 
@@ -621,7 +621,6 @@ class ImportarPlanilhaWidget(QWidget):
                 PaginatedTableWidget(
                     self.janela.formatar(prev, self.destino_atual),
                     linhas_por_pagina=10,
-                    status_cols=("Status", "Confirmação"),
                 )
             )
 
@@ -633,16 +632,18 @@ class ImportarPlanilhaWidget(QWidget):
         self.lay_val.addWidget(btn_conf, alignment=Qt.AlignmentFlag.AlignLeft)
 
     def _confirmar_importacao(self, res: dict):
+        v = self.janela.vocab()
+        nome_dest = v["ent1_plural"] if self.destino_atual == "eventos" else v["ent2_plural"]
         nome_arq = self.caminho_arq.name if self.caminho_arq else "arquivo"
         db.inserir_lote(self.destino_atual, res["ok"])
         db.registrar_arquivo(
             nome_arq,
-            self.destino_atual,
+            nome_dest,
             len(res["ok"]),
             "Processado" if not res["erros"] else "Processado com erros",
         )
-        self.janela.aviso(f"Importação: {len(res['ok'])} registro(s) de {nome_arq} em {self.destino_atual}")
-        self.janela.flash(f"{len(res['ok'])} registro(s) gravados em {self.destino_atual}.")
+        self.janela.aviso(f"Importação: {len(res['ok'])} registro(s) de {nome_arq} em {nome_dest}")
+        self.janela.flash(f"{len(res['ok'])} registro(s) gravados em {nome_dest}.")
         self._limpar_arquivo()
 
 
@@ -654,6 +655,10 @@ class OneWorldWindow(QMainWindow):
         cfg = {**PADROES, **db.cfg_ler("config", {})}
         if cfg.get("texto") not in ("P", "M", "G"):
             cfg["texto"] = "M"
+        if cfg.get("perfil_negocio") not in PERFIS_NEGOCIO:
+            cfg["perfil_negocio"] = PERFIL_PADRAO
+        if not isinstance(cfg.get("rotulos_custom"), dict):
+            cfg["rotulos_custom"] = {}
         self.cfg: dict = cfg
         self.campos_personalizados: list[str] = db.cfg_ler("campos_personalizados", [])
         self.notificacoes: list[str] = ["Sistema inicializado.", "Dados carregados do SQLite."]
@@ -669,7 +674,6 @@ class OneWorldWindow(QMainWindow):
             self.setWindowIcon(QIcon(str(logo)))
         self.resize(1340, 840)
 
-        # Estrutura raiz: Sidebar à esquerda + Área de conteúdo com rolagem à direita
         raiz = QWidget()
         raiz.setObjectName("MainContent")
         self.setCentralWidget(raiz)
@@ -677,16 +681,14 @@ class OneWorldWindow(QMainWindow):
         lay_raiz.setContentsMargins(0, 0, 0, 0)
         lay_raiz.setSpacing(0)
 
-        # Sidebar
         self.sidebar_frame = QFrame()
         self.sidebar_frame.setObjectName("Sidebar")
-        self.sidebar_frame.setFixedWidth(250)
+        self.sidebar_frame.setFixedWidth(255)
         self.lay_sidebar = QVBoxLayout(self.sidebar_frame)
         self.lay_sidebar.setContentsMargins(18, 22, 18, 18)
         self.lay_sidebar.setSpacing(8)
         lay_raiz.addWidget(self.sidebar_frame)
 
-        # Área principal com Scroll
         self.scroll = QScrollArea()
         self.scroll.setObjectName("PageScroll")
         self.scroll.setWidgetResizable(True)
@@ -698,7 +700,6 @@ class OneWorldWindow(QMainWindow):
         self.lay_pagina = QVBoxLayout(self.page_container)
         self.scroll.setWidget(self.page_container)
 
-        # Timer para atualização automática do Dashboard (30 s)
         self.timer_refresh = QTimer(self)
         self.timer_refresh.setInterval(30_000)
         self.timer_refresh.timeout.connect(self._ao_disparar_timer)
@@ -707,7 +708,10 @@ class OneWorldWindow(QMainWindow):
         self.reconstruir_sidebar()
         self.reconstruir_pagina()
 
-    # ── Helpers de estado e dados ──
+    # ── Helpers de estado, vocabulário e dados ──
+    def vocab(self) -> dict:
+        return obter_vocabulario(self.cfg)
+
     def dados(self, tab: str) -> pd.DataFrame:
         return db.carregar(tab, self.campos_personalizados)
 
@@ -780,7 +784,8 @@ class OneWorldWindow(QMainWindow):
 
         self._botoes_nav: dict[str, QPushButton] = {}
         for pg in PAGINAS:
-            btn = QPushButton(pg)
+            rot_visivel = rotulo_pagina(pg, self.cfg)
+            btn = QPushButton(rot_visivel.replace("&", "&&"))
             btn.setObjectName("NavBtn")
             btn.setProperty("active", "true" if pg == self.pagina_atual else "false")
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -794,10 +799,12 @@ class OneWorldWindow(QMainWindow):
         lbl_amb = QLabel("Ambiente")
         lbl_amb.setObjectName("Caption")
         self.lay_sidebar.addWidget(lbl_amb)
-        for info in ("Modo: local", "Banco: SQLite", "Status: operacional"):
-            self.lay_sidebar.addWidget(QLabel(info))
+        perfil_txt = self.cfg.get("perfil_negocio", PERFIL_PADRAO)
+        for info in (f"Perfil: {perfil_txt}", "Modo: local", "Banco: SQLite", "Status: operacional"):
+            lbl_i = QLabel(info)
+            lbl_i.setWordWrap(True)
+            self.lay_sidebar.addWidget(lbl_i)
 
-        # Reaplica estilo para atualizar propriedade [active="true"]
         self.sidebar_frame.style().unpolish(self.sidebar_frame)
         self.sidebar_frame.style().polish(self.sidebar_frame)
 
@@ -859,16 +866,16 @@ class OneWorldWindow(QMainWindow):
 
         self.lay_pagina.addStretch(1)
         self.lay_pagina.addWidget(Divider())
-        rodape = QLabel("OneWorld — Protótipo 02 · dados em SQLite local · IA simulada nesta versão.")
+        rodape = QLabel("OneWorld — BI & Gestão · dados em SQLite local · estrutura adaptável por perfil de negócio.")
         rodape.setObjectName("Caption")
         self.lay_pagina.addWidget(rodape)
 
     # ── PÁGINA 1: DASHBOARD ──
     def pagina_dashboard(self):
-        self._cabecalho("Dashboard", "Visão geral dos dados e indicadores")
+        v = self.vocab()
+        self._cabecalho("Dashboard", "Visão geral dos dados e indicadores do negócio")
         e, cv = self.dados("eventos"), self.dados("convidados")
 
-        # Filtros
         barra_f = QHBoxLayout()
         barra_f.setSpacing(16)
 
@@ -890,7 +897,7 @@ class OneWorldWindow(QMainWindow):
         barra_f.addLayout(col_f1, stretch=1)
 
         col_f2 = QVBoxLayout()
-        col_f2.addWidget(QLabel("Status"))
+        col_f2.addWidget(QLabel(v["rotulos"]["status"]))
         stat_atual = self.estado.get("dash_status", [])
         ms_status = MultiSelectChips(STATUS_EVENTO, stat_atual, self.cfg["cor"])
         ms_status.changed.connect(lambda vals: self._definir_filtro("dash_status", vals))
@@ -902,22 +909,20 @@ class OneWorldWindow(QMainWindow):
         f = bk.filtrar_eventos(e, mes_atual, stat_atual)
         conf = int((cv["confirmacao"] == "Confirmado").sum()) if not cv.empty else 0
 
-        # 5 Cartões de Métricas
         linha_m = QHBoxLayout()
         linha_m.setSpacing(12)
-        linha_m.addWidget(MetricCard("Eventos", len(f)))
-        linha_m.addWidget(MetricCard("Convidados previstos", int(f["convidados"].sum())))
-        linha_m.addWidget(MetricCard("Receita prevista", self.moeda(f["valor"].sum())))
-        linha_m.addWidget(MetricCard("Pendências", int(f["status"].isin(["Pendente", "Em planejamento"]).sum())))
-        linha_m.addWidget(MetricCard("Convidados confirmados", f"{conf} de {len(cv)}"))
+        linha_m.addWidget(MetricCard(v["metric_ent1"], len(f)))
+        linha_m.addWidget(MetricCard(v["metric_qtd"], int(f["convidados"].sum())))
+        linha_m.addWidget(MetricCard(v["metric_valor"], self.moeda(f["valor"].sum())))
+        linha_m.addWidget(MetricCard(v["metric_pend"], int(f["status"].isin(["Pendente", "Em planejamento"]).sum())))
+        linha_m.addWidget(MetricCard(v["metric_ent2_conf"], f"{conf} de {len(cv)}"))
         self.lay_pagina.addLayout(linha_m)
 
-        cap = QLabel("Receita prevista = valores cadastrados nas reservas; não representa pagamentos recebidos.")
+        cap = QLabel(v["legenda_valor"])
         cap.setObjectName("Caption")
         self.lay_pagina.addWidget(cap)
         self.lay_pagina.addWidget(Divider())
 
-        # Gráficos + Notificações
         linha_g = QHBoxLayout()
         linha_g.setSpacing(16)
 
@@ -927,13 +932,13 @@ class OneWorldWindow(QMainWindow):
 
         if not f.empty:
             t = f.assign(mes=pd.to_datetime(f["data"]).dt.strftime("%Y-%m"))
-            col_g1.addWidget(self._subtitulo("Receita prevista por mês"))
+            col_g1.addWidget(self._subtitulo(f"{v['metric_valor']} por mês"))
             col_g1.addWidget(BarChartWidget(t.groupby("mes")["valor"].sum(), self.cfg["cor"], self.cfg, True))
 
-            col_g2.addWidget(self._subtitulo("Eventos por status"))
+            col_g2.addWidget(self._subtitulo(v["grafico_status"]))
             col_g2.addWidget(BarChartWidget(f.groupby("status").size(), self.cfg["cor2"], self.cfg, False))
         else:
-            col_g1.addWidget(AlertBox("Nenhum evento para os filtros escolhidos.", "info"))
+            col_g1.addWidget(AlertBox("Nenhum registro para os filtros escolhidos.", "info"))
 
         col_g3.addWidget(self._subtitulo("Notificações"))
         if self.cfg.get("lembretes", True):
@@ -948,8 +953,7 @@ class OneWorldWindow(QMainWindow):
         linha_g.addLayout(col_g3, stretch=13)
         self.lay_pagina.addLayout(linha_g)
 
-        # Próximos eventos
-        self.lay_pagina.addWidget(self._subtitulo("Próximos eventos"))
+        self.lay_pagina.addWidget(self._subtitulo(v["proximos_titulo"]))
         prox = f[pd.to_datetime(f["data"]).dt.date >= date.today()] if not f.empty else f
         df_exibir = (prox if not prox.empty else f).drop(columns=["id"], errors="ignore")
         self.lay_pagina.addWidget(
@@ -965,14 +969,13 @@ class OneWorldWindow(QMainWindow):
         self.estado[chave] = valor
         self.reconstruir_pagina()
 
-    # ── PÁGINA 2: EVENTOS ──
+    # ── PÁGINA 2: ENTIDADE PRINCIPAL (OPERAÇÕES / VENDAS / PROJETOS / EVENTOS) ──
     def pagina_eventos(self):
-        self._cabecalho("Eventos", "Cadastro e gerenciamento")
+        v = self.vocab()
+        self._cabecalho(v["menu_ent1"], v["ent1_subtitulo"])
         abas = QTabWidget()
-        abas.setCurrentIndex(self.estado.get("tab_eventos", 0))
-        abas.currentChanged.connect(lambda idx: self.estado.__setitem__("tab_eventos", idx))
 
-        # Aba 1: Todos os eventos
+        # Aba 1: Listagem
         w_lista = QWidget()
         l_lista = QVBoxLayout(w_lista)
         l_lista.setContentsMargins(16, 16, 16, 16)
@@ -983,14 +986,14 @@ class OneWorldWindow(QMainWindow):
         barra_f.setSpacing(16)
 
         c1 = QVBoxLayout()
-        c1.addWidget(QLabel("Buscar evento"))
+        c1.addWidget(QLabel(f"Buscar em {v['ent1_plural'].lower()}"))
         ed_busca = QLineEdit(self.estado.get("ev_busca", ""))
         ed_busca.setPlaceholderText("Digite para filtrar...")
         c1.addWidget(ed_busca)
         barra_f.addLayout(c1, stretch=1)
 
         c2 = QVBoxLayout()
-        c2.addWidget(QLabel("Filtrar status"))
+        c2.addWidget(QLabel(f"Filtrar {v['rotulos']['status'].lower()}"))
         ms_stat = MultiSelectChips(STATUS_EVENTO, self.estado.get("ev_status", []), self.cfg["cor"])
         c2.addWidget(ms_stat)
         barra_f.addLayout(c2, stretch=2)
@@ -1031,14 +1034,15 @@ class OneWorldWindow(QMainWindow):
                 btn_csv.clicked.disconnect()
             except Exception:
                 pass
-            btn_csv.clicked.connect(lambda: self._exportar_csv_dialogo(df_f, "eventos.csv"))
+            nome_csv = f"{bk.chave(v['ent1_plural']) or 'operacoes'}.csv"
+            btn_csv.clicked.connect(lambda: self._exportar_csv_dialogo(df_f, nome_csv))
 
         ed_busca.textChanged.connect(lambda _: atualizar_lista_eventos())
         ms_stat.changed.connect(lambda _: atualizar_lista_eventos())
         atualizar_lista_eventos()
-        abas.addTab(w_lista, "Todos os eventos")
+        abas.addTab(w_lista, v["ent1_plural"])
 
-        # Aba 2: + Novo evento
+        # Aba 2: + Novo registro
         w_novo = QWidget()
         l_novo = QVBoxLayout(w_novo)
         l_novo.setContentsMargins(16, 16, 16, 16)
@@ -1058,18 +1062,18 @@ class OneWorldWindow(QMainWindow):
         def salvar_novo_evento():
             dd, extras = ler_ne()
             if not dd["cliente"]:
-                lbl_erro_ne.setText("Informe uma identificação.")
+                lbl_erro_ne.setText(f"Informe o campo '{v['rotulos']['cliente']}'.")
                 lbl_erro_ne.setVisible(True)
                 return
             db.inserir_lote("eventos", [dd], extras)
-            self.aviso(f"Novo evento: {dd['cliente']}")
-            self.flash("Evento cadastrado.")
+            self.aviso(f"Novo registro ({v['ent1_singular']}): {dd['cliente']}")
+            self.flash(f"{v['ent1_singular']} cadastrado(a) com sucesso.")
             self.reconstruir_pagina()
 
         btn_cad.clicked.connect(salvar_novo_evento)
         l_novo.addWidget(btn_cad, alignment=Qt.AlignmentFlag.AlignLeft)
         l_novo.addStretch(1)
-        abas.addTab(w_novo, "+ Novo evento")
+        abas.addTab(w_novo, f"+ Adicionar {v['ent1_singular']}")
 
         # Aba 3: Editar / excluir
         w_ed = QWidget()
@@ -1078,9 +1082,9 @@ class OneWorldWindow(QMainWindow):
         l_ed.setSpacing(12)
 
         if e.empty:
-            l_ed.addWidget(AlertBox("Nenhum evento cadastrado.", "info"))
+            l_ed.addWidget(AlertBox(f"Nenhum registro em {v['ent1_plural'].lower()}.", "info"))
         else:
-            l_ed.addWidget(QLabel("Escolha o evento"))
+            l_ed.addWidget(QLabel(f"Escolha o registro ({v['ent1_singular']})"))
             cb_sel = QComboBox()
             ids = []
             for r in e.itertuples():
@@ -1117,14 +1121,14 @@ class OneWorldWindow(QMainWindow):
                 def confirmar_edicao():
                     dd, extras = ler_ee()
                     if not dd["cliente"]:
-                        lbl_err.setText("Informe uma identificação.")
+                        lbl_err.setText(f"Informe o campo '{v['rotulos']['cliente']}'.")
                         lbl_err.setVisible(True)
                         return
                     db.atualizar("eventos", id_sel, dd, extras)
                     if dd["cliente"] != row["cliente"]:
                         db.renomear_evento_nos_convidados(dd["cliente"], row["cliente"])
-                    self.aviso(f"Evento atualizado: {dd['cliente']}")
-                    self.flash("Evento atualizado.")
+                    self.aviso(f"{v['ent1_singular']} atualizado(a): {dd['cliente']}")
+                    self.flash("Registro atualizado.")
                     self.reconstruir_pagina()
 
                 btn_salvar.clicked.connect(confirmar_edicao)
@@ -1133,7 +1137,9 @@ class OneWorldWindow(QMainWindow):
 
                 vinc = db.contar_convidados_do_evento(row["cliente"])
                 aviso_vinc = (
-                    f"{vinc} convidado(s) estão ligados a este evento e continuarão cadastrados." if vinc else ""
+                    f"{vinc} registro(s) em '{v['ent2_plural']}' estão vinculados a este item e continuarão cadastrados."
+                    if vinc
+                    else ""
                 )
                 lay_area_ed.addWidget(self._bloco_excluir("eventos", id_sel, row["cliente"], aviso_vinc))
 
@@ -1142,46 +1148,49 @@ class OneWorldWindow(QMainWindow):
             l_ed.addStretch(1)
 
         abas.addTab(w_ed, "Editar / excluir")
+        abas.setCurrentIndex(self.estado.get("tab_eventos", 0))
+        abas.currentChanged.connect(lambda idx: self.estado.__setitem__("tab_eventos", idx))
         self.lay_pagina.addWidget(abas)
 
-    def _montar_form_evento(self, v: dict | None):
-        v = {} if v is None else v
+    def _montar_form_evento(self, v_row: dict | None):
+        v_row = {} if v_row is None else v_row
+        rot = self.vocab()["rotulos"]
         form = QFormLayout()
         form.setSpacing(10)
 
-        ed_cli = QLineEdit(str(v.get("cliente", "")))
-        dt_val = bk.parse_date(v.get("data")) or date.today()
+        ed_cli = QLineEdit(str(v_row.get("cliente", "")))
+        dt_val = bk.parse_date(v_row.get("data")) or date.today()
         ed_dt = QDateEdit(QDate(dt_val.year, dt_val.month, dt_val.day))
         ed_dt.setCalendarPopup(True)
         ed_dt.setDisplayFormat("dd/MM/yyyy")
 
-        ed_loc = QLineEdit(str(v.get("local", "")))
+        ed_loc = QLineEdit(str(v_row.get("local", "")))
         sp_cv = QSpinBox()
         sp_cv.setRange(0, 1_000_000)
-        sp_cv.setValue(int(v.get("convidados", 0) or 0))
+        sp_cv.setValue(int(v_row.get("convidados", 0) or 0))
 
         sp_vl = QDoubleSpinBox()
         sp_vl.setRange(0.0, 1_000_000_000.0)
         sp_vl.setDecimals(2)
         sp_vl.setSingleStep(100.0)
-        sp_vl.setValue(float(v.get("valor", 0.0) or 0.0))
+        sp_vl.setValue(float(v_row.get("valor", 0.0) or 0.0))
 
         cb_st = QComboBox()
         cb_st.addItems(STATUS_EVENTO)
-        atual_st = v.get("status")
+        atual_st = v_row.get("status")
         if atual_st in STATUS_EVENTO:
             cb_st.setCurrentIndex(STATUS_EVENTO.index(atual_st))
 
-        form.addRow("Nome / identificação", ed_cli)
-        form.addRow("Data", ed_dt)
-        form.addRow("Local / espaço", ed_loc)
-        form.addRow("Convidados previstos", sp_cv)
-        form.addRow("Valor previsto", sp_vl)
-        form.addRow("Status", cb_st)
+        form.addRow(rot["cliente"], ed_cli)
+        form.addRow(rot["data"], ed_dt)
+        form.addRow(rot["local"], ed_loc)
+        form.addRow(rot["convidados"], sp_cv)
+        form.addRow(rot["valor"], sp_vl)
+        form.addRow(rot["status"], cb_st)
 
         campos_ex: dict[str, QLineEdit] = {}
         for c in self.campos_personalizados:
-            ed_x = QLineEdit(bk.texto(v.get(c, "")))
+            ed_x = QLineEdit(bk.texto(v_row.get(c, "")))
             campos_ex[c] = ed_x
             form.addRow(c, ed_x)
 
@@ -1226,14 +1235,14 @@ class OneWorldWindow(QMainWindow):
         lay.addWidget(btn, alignment=Qt.AlignmentFlag.AlignLeft)
         return w
 
-    # ── PÁGINA 3: CONVIDADOS & PLANILHAS ──
+    # ── PÁGINA 3: ENTIDADE SECUNDÁRIA (CADASTROS / CLIENTES / ATIVIDADES / CONVIDADOS) ──
     def pagina_convidados(self):
-        self._cabecalho("Convidados & Planilhas", "Registros tabulares e campos personalizáveis")
+        v = self.vocab()
+        rot = v["rotulos"]
+        self._cabecalho(v["menu_ent2"], v["ent2_subtitulo"])
         abas = QTabWidget()
-        abas.setCurrentIndex(self.estado.get("tab_convidados", 0))
-        abas.currentChanged.connect(lambda idx: self.estado.__setitem__("tab_convidados", idx))
 
-        # Aba 1: Convidados
+        # Aba 1: Listagem
         w_lista = QWidget()
         l_lista = QVBoxLayout(w_lista)
         l_lista.setContentsMargins(16, 16, 16, 16)
@@ -1244,21 +1253,21 @@ class OneWorldWindow(QMainWindow):
         barra_f.setSpacing(14)
 
         c1 = QVBoxLayout()
-        c1.addWidget(QLabel("Buscar convidado"))
+        c1.addWidget(QLabel(f"Buscar em {v['ent2_plural'].lower()}"))
         ed_busca = QLineEdit(self.estado.get("cv_busca", ""))
-        ed_busca.setPlaceholderText("Nome, contato, mesa...")
+        ed_busca.setPlaceholderText("Digite para filtrar...")
         c1.addWidget(ed_busca)
         barra_f.addLayout(c1, stretch=1)
 
         c2 = QVBoxLayout()
-        c2.addWidget(QLabel("Evento"))
+        c2.addWidget(QLabel(rot["evento"]))
         evs_disp = sorted(str(x) for x in g["evento"].unique() if str(x).strip()) if not g.empty else []
         ms_ev = MultiSelectChips(evs_disp, self.estado.get("cv_evento", []), self.cfg["cor"])
         c2.addWidget(ms_ev)
         barra_f.addLayout(c2, stretch=1)
 
         c3 = QVBoxLayout()
-        c3.addWidget(QLabel("Confirmação"))
+        c3.addWidget(QLabel(rot["confirmacao"]))
         ms_cf = MultiSelectChips(STATUS_CONV, self.estado.get("cv_conf", []), self.cfg["cor"])
         c3.addWidget(ms_cf)
         barra_f.addLayout(c3, stretch=1)
@@ -1268,7 +1277,7 @@ class OneWorldWindow(QMainWindow):
         linha_m.setSpacing(12)
         card_conf = MetricCard("Confirmados", 0)
         card_pend = MetricCard("Pendentes", 0)
-        card_rec = MetricCard("Recusaram", 0)
+        card_rec = MetricCard("Recusaram / Inativos", 0)
         linha_m.addWidget(card_conf)
         linha_m.addWidget(card_pend)
         linha_m.addWidget(card_rec)
@@ -1319,13 +1328,14 @@ class OneWorldWindow(QMainWindow):
                 btn_csv.clicked.disconnect()
             except Exception:
                 pass
-            btn_csv.clicked.connect(lambda: self._exportar_csv_dialogo(df_f, "convidados.csv"))
+            nome_csv = f"{bk.chave(v['ent2_plural']) or 'cadastros'}.csv"
+            btn_csv.clicked.connect(lambda: self._exportar_csv_dialogo(df_f, nome_csv))
 
         ed_busca.textChanged.connect(lambda _: atualizar_lista_conv())
         ms_ev.changed.connect(lambda _: atualizar_lista_conv())
         ms_cf.changed.connect(lambda _: atualizar_lista_conv())
         atualizar_lista_conv()
-        abas.addTab(w_lista, "Convidados")
+        abas.addTab(w_lista, v["ent2_plural"])
 
         # Aba 2: + Adicionar
         w_novo = QWidget()
@@ -1347,18 +1357,18 @@ class OneWorldWindow(QMainWindow):
         def salvar_novo_conv():
             dd, extras = ler_nc()
             if not dd["nome"]:
-                lbl_erro_nc.setText("Informe o nome do convidado.")
+                lbl_erro_nc.setText(f"Informe o campo '{rot['nome']}'.")
                 lbl_erro_nc.setVisible(True)
                 return
             db.inserir_lote("convidados", [dd], extras)
-            self.aviso(f"Convidado adicionado: {dd['nome']}")
-            self.flash("Convidado adicionado.")
+            self.aviso(f"Novo registro ({v['ent2_singular']}): {dd['nome']}")
+            self.flash(f"{v['ent2_singular']} adicionado(a).")
             self.reconstruir_pagina()
 
         btn_add.clicked.connect(salvar_novo_conv)
         l_novo.addWidget(btn_add, alignment=Qt.AlignmentFlag.AlignLeft)
         l_novo.addStretch(1)
-        abas.addTab(w_novo, "+ Adicionar")
+        abas.addTab(w_novo, f"+ Adicionar {v['ent2_singular']}")
 
         # Aba 3: Editar / excluir
         w_ed = QWidget()
@@ -1367,9 +1377,9 @@ class OneWorldWindow(QMainWindow):
         l_ed.setSpacing(12)
 
         if g.empty:
-            l_ed.addWidget(AlertBox("Nenhum convidado cadastrado.", "info"))
+            l_ed.addWidget(AlertBox(f"Nenhum registro em {v['ent2_plural'].lower()}.", "info"))
         else:
-            l_ed.addWidget(QLabel("Escolha o convidado"))
+            l_ed.addWidget(QLabel(f"Escolha o registro ({v['ent2_singular']})"))
             cb_sel = QComboBox()
             ids = []
             for r in g.itertuples():
@@ -1406,12 +1416,12 @@ class OneWorldWindow(QMainWindow):
                 def confirmar_edicao():
                     dd, extras = ler_ec()
                     if not dd["nome"]:
-                        lbl_err.setText("Informe o nome do convidado.")
+                        lbl_err.setText(f"Informe o campo '{rot['nome']}'.")
                         lbl_err.setVisible(True)
                         return
                     db.atualizar("convidados", id_sel, dd, extras)
-                    self.aviso(f"Convidado atualizado: {dd['nome']}")
-                    self.flash("Convidado atualizado.")
+                    self.aviso(f"{v['ent2_singular']} atualizado(a): {dd['nome']}")
+                    self.flash("Registro atualizado.")
                     self.reconstruir_pagina()
 
                 btn_salvar.clicked.connect(confirmar_edicao)
@@ -1432,16 +1442,19 @@ class OneWorldWindow(QMainWindow):
         l_imp.addWidget(ImportarPlanilhaWidget(self, destino_fixo="convidados", chave_estado="impcv"))
         l_imp.addStretch(1)
         abas.addTab(w_imp, "Importar planilha")
+        abas.setCurrentIndex(self.estado.get("tab_convidados", 0))
+        abas.currentChanged.connect(lambda idx: self.estado.__setitem__("tab_convidados", idx))
 
         self.lay_pagina.addWidget(abas)
 
-    def _montar_form_convidado(self, v: dict | None):
-        v = {} if v is None else v
+    def _montar_form_convidado(self, v_row: dict | None):
+        v_row = {} if v_row is None else v_row
+        rot = self.vocab()["rotulos"]
         form = QFormLayout()
         form.setSpacing(10)
 
         clientes = list(dict.fromkeys(self.dados("eventos")["cliente"].tolist()))
-        atual_ev = str(v.get("evento", ""))
+        atual_ev = str(v_row.get("evento", ""))
         if atual_ev and atual_ev not in clientes:
             clientes.append(atual_ev)
 
@@ -1453,32 +1466,32 @@ class OneWorldWindow(QMainWindow):
         else:
             w_ev = QLineEdit(atual_ev)
 
-        ed_nm = QLineEdit(str(v.get("nome", "")))
-        ed_ms = QLineEdit(bk.texto(v.get("mesa", "")))
+        ed_nm = QLineEdit(str(v_row.get("nome", "")))
+        ed_ms = QLineEdit(bk.texto(v_row.get("mesa", "")))
         sp_ac = QSpinBox()
         sp_ac.setRange(0, 1000)
-        sp_ac.setValue(int(v.get("acompanhantes", 0) or 0))
-        ed_ct = QLineEdit(str(v.get("contato", "")))
-        restr_val = "" if v.get("restricao", "—") == "—" else str(v.get("restricao", ""))
+        sp_ac.setValue(int(v_row.get("acompanhantes", 0) or 0))
+        ed_ct = QLineEdit(str(v_row.get("contato", "")))
+        restr_val = "" if v_row.get("restricao", "—") == "—" else str(v_row.get("restricao", ""))
         ed_rs = QLineEdit(restr_val)
 
         cb_cf = QComboBox()
         cb_cf.addItems(STATUS_CONV)
-        c_atual = v.get("confirmacao")
+        c_atual = v_row.get("confirmacao")
         if c_atual in STATUS_CONV:
             cb_cf.setCurrentIndex(STATUS_CONV.index(c_atual))
 
-        form.addRow("Evento", w_ev)
-        form.addRow("Nome", ed_nm)
-        form.addRow("Mesa", ed_ms)
-        form.addRow("Acompanhantes", sp_ac)
-        form.addRow("Contato", ed_ct)
-        form.addRow("Restrição alimentar", ed_rs)
-        form.addRow("Confirmação", cb_cf)
+        form.addRow(rot["evento"], w_ev)
+        form.addRow(rot["nome"], ed_nm)
+        form.addRow(rot["mesa"], ed_ms)
+        form.addRow(rot["acompanhantes"], sp_ac)
+        form.addRow(rot["contato"], ed_ct)
+        form.addRow(rot["restricao"], ed_rs)
+        form.addRow(rot["confirmacao"], cb_cf)
 
         campos_ex: dict[str, QLineEdit] = {}
         for c in self.campos_personalizados:
-            ed_x = QLineEdit(bk.texto(v.get(c, "")))
+            ed_x = QLineEdit(bk.texto(v_row.get(c, "")))
             campos_ex[c] = ed_x
             form.addRow(c, ed_x)
 
@@ -1525,7 +1538,7 @@ class OneWorldWindow(QMainWindow):
 
         self.lay_pagina.addWidget(QLabel("Pergunte sobre seus dados"))
         ed_perg = QPlainTextEdit()
-        ed_perg.setPlaceholderText("Ex.: Qual é a receita prevista?")
+        ed_perg.setPlaceholderText("Ex.: Qual é o valor/receita previsto por mês?")
         ed_perg.setMaximumHeight(95)
         self.lay_pagina.addWidget(ed_perg)
 
@@ -1673,11 +1686,10 @@ class OneWorldWindow(QMainWindow):
     # ── PÁGINA 7: CONFIGURAÇÕES ──
     def pagina_config(self):
         cfg = self.cfg
-        self._cabecalho("Configurações", "Personalização da interface e eficiência")
+        v = self.vocab()
+        self._cabecalho("Configurações", "Personalização do negócio, interface e eficiência")
 
         abas = QTabWidget()
-        abas.setCurrentIndex(self.estado.get("tab_config", 0))
-        abas.currentChanged.connect(lambda idx: self.estado.__setitem__("tab_config", idx))
 
         # Aba 1: Personalização visual
         w_vis = QWidget()
@@ -1685,7 +1697,7 @@ class OneWorldWindow(QMainWindow):
         l_vis.setContentsMargins(16, 16, 16, 16)
         l_vis.setSpacing(12)
 
-        l_vis.addWidget(QLabel("Nome do sistema"))
+        l_vis.addWidget(QLabel("Nome do sistema / empresa"))
         ed_nome = QLineEdit(cfg["nome"])
         ed_nome.textChanged.connect(lambda txt: cfg.__setitem__("nome", txt))
         l_vis.addWidget(ed_nome)
@@ -1714,11 +1726,13 @@ class OneWorldWindow(QMainWindow):
         linha_cores.addWidget(btn_cor2)
 
         btn_reset_cor = QPushButton("Voltar às cores OneWorld (roxo e verde)")
+
         def resetar_cores():
             cfg["cor"], cfg["cor2"] = ROXO, VERDE
             self.aplicar_tema()
             self.reconstruir_sidebar()
             self.reconstruir_pagina()
+
         btn_reset_cor.clicked.connect(resetar_cores)
         linha_cores.addWidget(btn_reset_cor)
         linha_cores.addStretch(1)
@@ -1757,7 +1771,6 @@ class OneWorldWindow(QMainWindow):
         form_vis.addRow("Tamanho do texto", cb_txt)
         l_vis.addLayout(form_vis)
 
-        # Card de Prévia
         card_prev = QFrame()
         card_prev.setObjectName("OwCard")
         lay_prev = QHBoxLayout(card_prev)
@@ -1784,7 +1797,6 @@ class OneWorldWindow(QMainWindow):
         lay_prev.addStretch(1)
         l_vis.addWidget(card_prev)
 
-        # Logotipo
         linha_logo = QHBoxLayout()
         btn_up_logo = QPushButton("Alterar logotipo (PNG, JPG ou SVG)...")
 
@@ -1804,11 +1816,13 @@ class OneWorldWindow(QMainWindow):
 
         if bk.logo_personalizado():
             btn_rm_logo = QPushButton("Remover logotipo personalizado")
+
             def rm_logo():
                 bk.remover_logo()
                 self.flash("Logotipo personalizado removido.")
                 self.reconstruir_sidebar()
                 self.reconstruir_pagina()
+
             btn_rm_logo.clicked.connect(rm_logo)
             linha_logo.addWidget(btn_rm_logo)
 
@@ -1826,10 +1840,13 @@ class OneWorldWindow(QMainWindow):
         form_ef = QFormLayout()
         pgs = PAGINAS[:-1]
         cb_pginic = QComboBox()
-        cb_pginic.addItems(pgs)
+        for p_key in pgs:
+            cb_pginic.addItem(rotulo_pagina(p_key, cfg), userData=p_key)
         if cfg["pagina_inicial"] in pgs:
             cb_pginic.setCurrentIndex(pgs.index(cfg["pagina_inicial"]))
-        cb_pginic.currentTextChanged.connect(lambda txt: cfg.__setitem__("pagina_inicial", txt))
+        cb_pginic.currentIndexChanged.connect(
+            lambda _: cfg.__setitem__("pagina_inicial", cb_pginic.currentData())
+        )
 
         sp_linhas = QSpinBox()
         sp_linhas.setRange(5, 100)
@@ -1842,15 +1859,15 @@ class OneWorldWindow(QMainWindow):
 
         chk_auto = QCheckBox("Atualização automática do Dashboard (30 s)")
         chk_auto.setChecked(bool(cfg.get("auto_refresh", False)))
-        chk_auto.toggled.connect(lambda v: (cfg.__setitem__("auto_refresh", v), self.aplicar_tema()))
+        chk_auto.toggled.connect(lambda val: (cfg.__setitem__("auto_refresh", val), self.aplicar_tema()))
 
         chk_filt = QCheckBox("Lembrar filtros ao trocar de página")
         chk_filt.setChecked(bool(cfg.get("lembrar_filtros", True)))
-        chk_filt.toggled.connect(lambda v: cfg.__setitem__("lembrar_filtros", v))
+        chk_filt.toggled.connect(lambda val: cfg.__setitem__("lembrar_filtros", val))
 
-        chk_lemb = QCheckBox("Lembretes de eventos nos próximos 7 dias")
+        chk_lemb = QCheckBox("Lembretes de prazos/operações nos próximos 7 dias")
         chk_lemb.setChecked(bool(cfg.get("lembretes", True)))
-        chk_lemb.toggled.connect(lambda v: cfg.__setitem__("lembretes", v))
+        chk_lemb.toggled.connect(lambda val: cfg.__setitem__("lembretes", val))
 
         l_efic.addWidget(chk_auto)
         l_efic.addWidget(chk_filt)
@@ -1889,7 +1906,7 @@ class OneWorldWindow(QMainWindow):
         l_dds.addWidget(QLabel("Integrações externas (pagamentos, calendário, API): fora do escopo confirmado do MVP."))
         l_dds.addWidget(QLabel("Exportação: CSV por tabela e Markdown na tela Orientação IA."))
         l_dds.addStretch(1)
-        abas.addTab(w_dds, "Dados & integrações")
+        abas.addTab(w_dds, "Dados && integrações")
 
         # Aba 4: Segurança
         w_seg = QWidget()
@@ -1921,15 +1938,131 @@ class OneWorldWindow(QMainWindow):
         l_seg.addStretch(1)
         abas.addTab(w_seg, "Segurança")
 
-        # Aba 5: Modelos & campos
+        # Aba 5: Modelos & campos (Perfis de Negócio + Nomenclatura + Campos Extras)
         w_cp = QWidget()
         l_cp = QVBoxLayout(w_cp)
         l_cp.setContentsMargins(16, 16, 16, 16)
-        l_cp.setSpacing(12)
+        l_cp.setSpacing(14)
+
+        l_cp.addWidget(self._subtitulo("Modelo / Perfil do Empreendimento"))
+        cap_mod = QLabel(
+            "Escolha um modelo pronto para adaptar instantaneamente menus, indicadores, formulários e tabelas "
+            "ao ramo da empresa, ou personalize cada rótulo logo abaixo."
+        )
+        cap_mod.setObjectName("Caption")
+        cap_mod.setWordWrap(True)
+        l_cp.addWidget(cap_mod)
+
+        barra_perfil = QHBoxLayout()
+        cb_perfil = QComboBox()
+        lista_perfis = list(PERFIS_NEGOCIO.keys())
+        cb_perfil.addItems(lista_perfis)
+        perfil_atual = cfg.get("perfil_negocio", PERFIL_PADRAO)
+        if perfil_atual in lista_perfis:
+            cb_perfil.setCurrentIndex(lista_perfis.index(perfil_atual))
+
+        def trocar_perfil(novo_p: str):
+            cfg["perfil_negocio"] = novo_p
+            cfg["rotulos_custom"] = {}
+            db.cfg_gravar("config", cfg)
+            self.aviso(f"Perfil de negócio alterado para: {novo_p}")
+            self.flash(f"Perfil '{novo_p}' aplicado em todo o sistema.")
+            self.reconstruir_sidebar()
+            self.reconstruir_pagina()
+
+        cb_perfil.currentTextChanged.connect(trocar_perfil)
+        barra_perfil.addWidget(QLabel("<b>Perfil ativo:</b>"))
+        barra_perfil.addWidget(cb_perfil, stretch=1)
+        l_cp.addLayout(barra_perfil)
+
+        # Editor de Nomenclatura Personalizada
+        exp_nom = ExpanderWidget("Personalizar nomenclatura de menus e colunas deste perfil", aberto=False)
+        grade_nom = QGridLayout()
+        grade_nom.setHorizontalSpacing(16)
+        grade_nom.setVerticalSpacing(8)
+
+        ed_m1 = QLineEdit(v["menu_ent1"])
+        ed_e1_p = QLineEdit(v["ent1_plural"])
+        ed_m2 = QLineEdit(v["menu_ent2"])
+        ed_e2_p = QLineEdit(v["ent2_plural"])
+
+        grade_nom.addWidget(QLabel("<b>Menu Principal 1:</b>"), 0, 0)
+        grade_nom.addWidget(ed_m1, 0, 1)
+        grade_nom.addWidget(QLabel("<b>Título Tabela 1 (plural):</b>"), 0, 2)
+        grade_nom.addWidget(ed_e1_p, 0, 3)
+
+        grade_nom.addWidget(QLabel("<b>Menu Principal 2:</b>"), 1, 0)
+        grade_nom.addWidget(ed_m2, 1, 1)
+        grade_nom.addWidget(QLabel("<b>Título Tabela 2 (plural):</b>"), 1, 2)
+        grade_nom.addWidget(ed_e2_p, 1, 3)
+
+        campos_editaveis = [
+            ("cliente", "Coluna Identificação (Tab. 1)"),
+            ("local", "Coluna Categoria/Local (Tab. 1)"),
+            ("convidados", "Coluna Quantidade/Volume (Tab. 1)"),
+            ("valor", "Coluna Valor/Receita (Tab. 1)"),
+            ("evento", "Coluna Vínculo (Tab. 2)"),
+            ("nome", "Coluna Nome/Item (Tab. 2)"),
+            ("mesa", "Coluna Grupo/Código (Tab. 2)"),
+            ("acompanhantes", "Coluna Qtd. Extra (Tab. 2)"),
+            ("contato", "Coluna Contato (Tab. 2)"),
+            ("restricao", "Coluna Observações (Tab. 2)"),
+        ]
+        inputs_rotulos: dict[str, QLineEdit] = {}
+        for idx_c, (ch_c, desc_c) in enumerate(campos_editaveis):
+            lin = 2 + (idx_c // 2)
+            col_base = (idx_c % 2) * 2
+            grade_nom.addWidget(QLabel(desc_c), lin, col_base)
+            ed_r = QLineEdit(v["rotulos"][ch_c])
+            inputs_rotulos[ch_c] = ed_r
+            grade_nom.addWidget(ed_r, lin, col_base + 1)
+
+        exp_nom.corpo_layout.addLayout(grade_nom)
+
+        barra_btns_nom = QHBoxLayout()
+        btn_aplicar_nom = QPushButton("Aplicar nomenclatura personalizada")
+        btn_aplicar_nom.setObjectName("PrimaryBtn")
+
+        def salvar_nomenclatura():
+            cfg["rotulos_custom"] = {
+                "menu_ent1": ed_m1.text().strip() or v["menu_ent1"],
+                "ent1_plural": ed_e1_p.text().strip() or v["ent1_plural"],
+                "metric_ent1": ed_e1_p.text().strip() or v["metric_ent1"],
+                "menu_ent2": ed_m2.text().strip() or v["menu_ent2"],
+                "ent2_plural": ed_e2_p.text().strip() or v["ent2_plural"],
+                "metric_qtd": inputs_rotulos["convidados"].text().strip() or v["metric_qtd"],
+                "metric_valor": inputs_rotulos["valor"].text().strip() or v["metric_valor"],
+                "rotulos": {ch: ed.text().strip() for ch, ed in inputs_rotulos.items() if ed.text().strip()},
+            }
+            db.cfg_gravar("config", cfg)
+            self.flash("Nomenclatura personalizada aplicada e salva.")
+            self.reconstruir_sidebar()
+            self.reconstruir_pagina()
+
+        btn_aplicar_nom.clicked.connect(salvar_nomenclatura)
+
+        btn_limpar_nom = QPushButton("Restaurar nomes padrão deste perfil")
+
+        def limpar_nomenclatura():
+            cfg["rotulos_custom"] = {}
+            db.cfg_gravar("config", cfg)
+            self.flash("Nomes originais do perfil restaurados.")
+            self.reconstruir_sidebar()
+            self.reconstruir_pagina()
+
+        btn_limpar_nom.clicked.connect(limpar_nomenclatura)
+        barra_btns_nom.addWidget(btn_aplicar_nom)
+        barra_btns_nom.addWidget(btn_limpar_nom)
+        barra_btns_nom.addStretch(1)
+        exp_nom.corpo_layout.addLayout(barra_btns_nom)
+        l_cp.addWidget(exp_nom)
+
+        l_cp.addWidget(Divider())
+        l_cp.addWidget(self._subtitulo("Campos adicionais personalizados (Colunas Extras)"))
 
         barra_novo_cp = QHBoxLayout()
         ed_novo_cp = QLineEdit()
-        ed_novo_cp.setPlaceholderText("Ex.: Categoria")
+        ed_novo_cp.setPlaceholderText("Ex.: Fornecedor, CNPJ, Centro de Custo...")
         btn_add_cp = QPushButton("Adicionar campo")
 
         lbl_err_cp = QLabel()
@@ -1957,7 +2090,7 @@ class OneWorldWindow(QMainWindow):
         l_cp.addWidget(lbl_err_cp)
 
         if not self.campos_personalizados:
-            l_cp.addWidget(AlertBox("Nenhum campo personalizado.", "info"))
+            l_cp.addWidget(AlertBox("Nenhum campo extra adicionado.", "info"))
         else:
             for cp in list(self.campos_personalizados):
                 linha_item = QHBoxLayout()
@@ -1967,22 +2100,21 @@ class OneWorldWindow(QMainWindow):
                 linha_item.addWidget(btn_rm, stretch=1)
                 l_cp.addLayout(linha_item)
             cap_cp = QLabel(
-                "Os campos aparecem nos formulários e tabelas de Eventos e Convidados. "
+                f"Os campos aparecem nos formulários e tabelas de {v['ent1_plural']} e {v['ent2_plural']}. "
                 "Os valores já gravados ficam guardados mesmo se o campo for removido."
             )
             cap_cp.setObjectName("Caption")
             cap_cp.setWordWrap(True)
             l_cp.addWidget(cap_cp)
 
-        l_cp.addWidget(self._subtitulo("Modelos"))
-        l_cp.addWidget(QLabel("Área reservada para modelos de eventos, formulários, dashboards e estruturas de dados."))
         l_cp.addStretch(1)
-        abas.addTab(w_cp, "Modelos & campos")
+        abas.addTab(w_cp, "Modelos && campos")
+        abas.setCurrentIndex(self.estado.get("tab_config", 0))
+        abas.currentChanged.connect(lambda idx: self.estado.__setitem__("tab_config", idx))
 
         self.lay_pagina.addWidget(abas)
         self.lay_pagina.addWidget(Divider())
 
-        # Botões inferiores Salvar / Restaurar padrões
         barra_acoes = QHBoxLayout()
         btn_salvar_cfg = QPushButton("Salvar alterações")
         btn_salvar_cfg.setObjectName("PrimaryBtn")
@@ -2002,6 +2134,7 @@ class OneWorldWindow(QMainWindow):
 
         def restaurar_padroes():
             self.cfg.update(PADROES)
+            self.cfg["rotulos_custom"] = {}
             db.cfg_gravar("config", self.cfg)
             self.aplicar_tema()
             self.reconstruir_sidebar()
