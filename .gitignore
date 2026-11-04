@@ -42,3 +42,4 @@ oneworld_modelo_base.py
 *.sublime-workspace
 *.swp
 *.swo
+.pytest_cache/
