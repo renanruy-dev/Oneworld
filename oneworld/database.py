@@ -136,6 +136,8 @@ def excluir_anotacao(id_):
 
 # ── Relatórios da Orientação IA ──
 def salvar_relatorio(pergunta, resposta):
+    from . import ia  # IA externa (BYOK) se houver chave configurada; senão a resposta segue inalterada
+    resposta = ia.resposta_com_llm(pergunta, resposta)
     executar("INSERT INTO relatorios_ia(data,pergunta,resposta) VALUES(?,?,?)",
              (datetime.now().strftime("%d/%m/%Y %H:%M"), pergunta, resposta))
 

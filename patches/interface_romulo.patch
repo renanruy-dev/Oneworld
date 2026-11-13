@@ -1,0 +1,44 @@
+--- a/oneworld/frontend.py
++++ b/oneworld/frontend.py
+@@ -8,6 +8,7 @@
+ 
+ from . import backend as bk
+ from . import database as db
++from . import ia, mapeamento as mp
+ from .config import (CAMPOS, CAMPOS_DESTINO, FILTROS, NAO_USAR, OBRIGATORIOS, PADROES, PAGINAS,
+                      ROXO, STATUS_CONV, STATUS_CORES, STATUS_EVENTO, VERDE, BACKUP_DIR)
+ from .tema import gerar_css
+@@ -178,7 +179,7 @@
+                    "Nada é gravado antes do seu clique em confirmar.")
+         return
+     try:
+-        data = bk.ler_arquivo(arq)
++        data = mp.ler_arquivo(arq)  # planilhas livres: acha aba/cabeçalho e ignora títulos e linhas de total
+     except Exception as ex:  # noqa: BLE001 — mostrar o motivo ao usuário
+         st.error(f"Não foi possível ler o arquivo: {ex}")
+         return
+@@ -191,7 +192,7 @@
+         "Destino dos dados", ["eventos", "convidados"], horizontal=True, key=f"{ch}_dest",
+         format_func=lambda x: {"eventos": "Eventos", "convidados": "Convidados"}[x])
+     st.markdown("**Mapeamento de colunas** — sugerido automaticamente por nome; ajuste se precisar")
+-    sug = bk.sugerir(list(data.columns), destino)
++    sug = mp.sugerir(data, destino)  # por nome E por conteúdo da coluna
+     opcoes = [NAO_USAR] + list(data.columns)
+     mapa, cols = {}, st.columns(2)
+     for i, (campo, rotulo) in enumerate(CAMPOS_DESTINO[destino].items()):
+@@ -504,6 +505,15 @@
+         st.caption(f"{db.contar_backups()} backup(s) na pasta {BACKUP_DIR}. "
+                    "A restauração ainda é um requisito pendente.")
+         st.warning("Chaves de API (BYOK) devem ficar no arquivo .env, nunca no código.")
++        if st.button("Testar conexão com a IA", key="cfg_testar_ia"):
++            with st.spinner("Testando a conexão..."):
++                r = ia.testar_conexao()
++            if r["ok"]:
++                st.success(f"{r['modelo']}: {r['mensagem']} ({r['latencia_ms']} ms)")
++            else:
++                st.error(r["mensagem"])
++            for nivel, txt in r["diagnostico"]:
++                st.caption({"ok": "✅", "aviso": "⚠️", "erro": "❌"}[nivel] + " " + txt)
+     with campos:
+         novo = st.text_input("Nome do novo campo", placeholder="Ex.: Categoria")
+         if st.button("Adicionar campo") and novo.strip():
