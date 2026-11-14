@@ -10,16 +10,22 @@ from unittest.mock import patch
 import pandas as pd
 from pandas.testing import assert_frame_equal
 
-os.environ["QT_QPA_PLATFORM"] = "offscreen"
-from PyQt6.QtWidgets import QApplication
-_qt_app = QApplication.instance() or QApplication(["-platform", "offscreen"])
+try:
+    os.environ["QT_QPA_PLATFORM"] = "offscreen"
+    from PyQt6.QtWidgets import QApplication
+    _qt_app = QApplication.instance() or QApplication(["-platform", "offscreen"])
+    from oneworld.frontend_bi import BIDashboardWidget
+    TEM_PYQT6 = True
+except (ImportError, OSError):
+    TEM_PYQT6 = False
+    BIDashboardWidget = None
 
 from oneworld import database
-from oneworld.frontend_bi import BIDashboardWidget
 
 RAIZ = Path(__file__).resolve().parents[1]
 
 
+@unittest.skipUnless(TEM_PYQT6, "PyQt6 ou bibliotecas de display não disponíveis no ambiente")
 class TestDashboard(unittest.TestCase):
     def setUp(self):
         self.temporario = tempfile.TemporaryDirectory()
@@ -181,6 +187,7 @@ class TestDashboard(unittest.TestCase):
         self.assertEqual(self.widget.obter_kpi_resultados()[0].valor, 8.0)
 
 
+@unittest.skipUnless(TEM_PYQT6, "PyQt6 ou bibliotecas de display não disponíveis no ambiente")
 class TestUploads(unittest.TestCase):
     def setUp(self):
         self.widget = BIDashboardWidget()
