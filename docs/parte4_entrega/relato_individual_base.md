@@ -1,6 +1,6 @@
 # Relato individual — Felipe — OneWorld
 
-Versão para revisão, atualizada em 14/11/2026. Texto elaborado com base nas conversas sobre a Parte 4, no histórico Git e nas evidências locais. A identificação acadêmica e a reflexão pessoal complementar estão reunidas ao final.
+Versão para revisão, atualizada em 14/11/2026. Texto elaborado com base nas conversas sobre a Parte 4, no histórico Git e nas evidências locais. As informações ainda necessárias estão reunidas ao final.
 
 ## Participação no projeto
 
@@ -18,6 +18,8 @@ A verificação do código atual em 14/11/2026 terminou com 60 testes aprovados.
 
 ## Desafios técnicos e organização da entrega
 
+Minha principal dificuldade foi decidir quais KPIs utilizar no dashboard. A escolha dos indicadores foi o ponto em que encontrei mais dificuldade durante minha participação. Minha atuação ficou concentrada na Parte 4, sem interação com as outras partes do projeto.
+
 Os registros do desenvolvimento documentam problemas relacionados à troca de datasets, à limpeza de filtros, à interpretação de datas, à ordenação do histograma e à identificação de alterações em dados SQLite. Essas situações foram tratadas na implementação e nos testes da Parte 4. Elas mostram a importância de verificar entradas diferentes e de conferir a coerência entre os controles da interface e os resultados apresentados.
 
 Na etapa de fechamento, solicitei que fossem concluídas as tarefas possíveis com as informações disponíveis. Foram organizados o manual do dashboard, os roteiros de apresentação, capacitação e validação, o questionário de avaliação e os textos técnicos para incorporação ao relatório da equipe. A demonstração passou a ser gerada a partir dos CSVs do projeto, facilitando sua reprodução em uma pasta temporária.
@@ -30,10 +32,10 @@ O projeto prevê a Casa Grande Eventos como parceira de validação. O dashboard
 
 Os materiais consultados contêm testes técnicos, exemplos sintéticos e instrumentos preparados para as atividades com o parceiro. A participação pessoal em demonstração, capacitação ou coleta de avaliação ainda precisa ser confirmada. O estado atual também mantém limitações como configurações restritas à sessão, um gráfico por vez e leitura da primeira aba de arquivos XLSX.
 
-## Três complementos para fechar a versão pessoal
+## Complementos para fechar a versão pessoal
 
 1. **Identificação e período.** Informar nome completo, curso, turma, disciplina e matrícula conforme o modelo exigido, além do período efetivo de participação. Os registros técnicos consultados abrangem outubro e novembro de 2026.
-2. **Reflexão pessoal.** Acrescentar um parágrafo sobre uma dificuldade que você vivenciou e o que aprendeu ao trabalhar com o projeto. As dificuldades técnicas documentadas acima podem ajudar a lembrar de uma situação concreta.
+2. **Aprendizado pessoal.** Informar, em uma frase, o que aprendeu ao decidir os KPIs. A dificuldade e a ausência de interação com outras partes já foram incorporadas conforme seu relato.
 3. **Atividade com o parceiro.** Confirmar se participou de demonstração, capacitação ou conversa com o parceiro. Se participou, informar quando, seu papel e o retorno recebido. Se ainda não participou, basta registrar essa situação.
 
 Após esses complementos, revisar o texto conforme o modelo da disciplina e confirmar que a descrição corresponde à sua participação.
