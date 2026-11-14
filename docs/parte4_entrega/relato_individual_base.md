@@ -27,7 +27,11 @@ A verificação do código atual em 14/11/2026 terminou com 60 testes aprovados.
 
 ## Desafios técnicos e organização da entrega
 
-Minha principal dificuldade foi decidir quais KPIs utilizar no dashboard. A escolha dos indicadores foi o ponto em que encontrei mais dificuldade durante minha participação. Minha atuação ficou concentrada na Parte 4, sem interação com as outras partes do projeto.
+Minha principal dificuldade foi decidir quais KPIs utilizar no dashboard. A seleção das operações foi feita pelo assistente de IA utilizado no desenvolvimento. Tive contato com todos os outros participantes do projeto, mas a parte de código não teve uma entrega conjunta. Minha contribuição técnica ficou concentrada na Parte 4.
+
+A escolha das operações atende à proposta de analisar dados de diferentes áreas. A contagem informa o volume de registros; a contagem de distintos identifica quantos valores diferentes existem em uma coluna; a soma apresenta um total acumulado; a média resume o valor médio; e o mínimo e o máximo mostram os extremos. Nos exemplos do projeto, essas operações permitem apresentar o total de vendas, a média das notas e a quantidade total em estoque.
+
+O princípio técnico é relacionar a pergunta da análise à coluna e à operação adequadas. Para saber quanto foi vendido, utiliza-se a soma dos valores; para conhecer a média das notas, utiliza-se a média; para saber quantos produtos diferentes aparecem, utiliza-se a contagem de distintos. A relevância de cada indicador depende do objetivo de quem analisa os dados. O dashboard deixa essa configuração disponível ao usuário.
 
 Os registros do desenvolvimento documentam problemas relacionados à troca de datasets, à limpeza de filtros, à interpretação de datas, à ordenação do histograma e à identificação de alterações em dados SQLite. Essas situações foram tratadas na implementação e nos testes da Parte 4. Elas mostram a importância de verificar entradas diferentes e de conferir a coerência entre os controles da interface e os resultados apresentados.
 
@@ -43,10 +47,9 @@ Os materiais consultados contêm testes técnicos, exemplos sintéticos e instru
 
 ## Complementos para fechar a versão pessoal
 
-1. **Aprendizado pessoal.** Informar, em uma frase, o que aprendeu ao decidir os KPIs. A dificuldade e a ausência de interação com outras partes já foram incorporadas conforme seu relato.
-2. **Atividade com o parceiro.** Confirmar se participou de demonstração, capacitação ou conversa com o parceiro. Se participou, informar quando, seu papel e o retorno recebido. Se ainda não participou, basta registrar essa situação.
+A participação específica em demonstração, capacitação ou conversa com o parceiro permanece sem detalhamento nos registros consultados. O contato com os demais participantes foi confirmado pelo integrante. Caso existam atividades com o parceiro a incluir, registrar data aproximada, papel desempenhado e retorno recebido.
 
-Após esses complementos, revisar o texto conforme o modelo da disciplina e confirmar que a descrição corresponde à sua participação.
+Revisar o texto conforme o modelo da disciplina e confirmar que a descrição corresponde à sua participação.
 
 ## Fontes de preparação
 
