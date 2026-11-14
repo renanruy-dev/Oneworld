@@ -43,6 +43,8 @@ from PyQt6.QtWidgets import (
 
 from . import backend as bk
 from . import database as db
+from . import ia
+from . import mapeamento as mp
 from .config import (
     BACKUP_DIR,
     CAMPOS,
@@ -467,7 +469,7 @@ class ImportarPlanilhaWidget(QWidget):
         self.caminho_arq = p
         self.janela.estado[f"{self.chave}_arq"] = p
         try:
-            self.df_lido = bk.ler_arquivo(p)
+            self.df_lido = mp.ler_arquivo(p)
             self.janela.estado[f"{self.chave}_df"] = self.df_lido
             self.janela.estado.pop(f"{self.chave}_erro", None)
         except Exception as ex:  # noqa: BLE001
@@ -534,10 +536,18 @@ class ImportarPlanilhaWidget(QWidget):
             box_dest.addStretch(1)
             self.lay_din.addLayout(box_dest)
 
-        lbl_map = QLabel("<b>Mapeamento de colunas</b> — sugerido automaticamente por nome; ajuste se precisar")
+        lbl_map = QLabel(
+            "<b>Mapeamento de colunas</b> — sugerido automaticamente por nome e conteúdo; ajuste se precisar"
+        )
         self.lay_din.addWidget(lbl_map)
 
-        sug = bk.sugerir(list(data.columns), self.destino_atual, self.janela.cfg)
+        sug = mp.sugerir(data, self.destino_atual)
+        sug_cfg = bk.sugerir(list(data.columns), self.destino_atual, self.janela.cfg)
+        usadas = set(sug.values())
+        for campo, col in sug_cfg.items():
+            if campo not in sug and col not in usadas:
+                sug[campo] = col
+                usadas.add(col)
         opcoes = [NAO_USAR] + list(data.columns)
         grade = QGridLayout()
         grade.setHorizontalSpacing(16)
@@ -1538,13 +1548,14 @@ class OneWorldWindow(QMainWindow):
     # ── PÁGINA 5: ORIENTAÇÃO IA ──
     def pagina_ia(self):
         self._cabecalho("Orientação IA", "Perguntas e análises baseadas nos dados")
-        self.lay_pagina.addWidget(
-            AlertBox(
-                "Resposta SIMULADA por regras locais. A IA externa (BYOK) ainda é uma decisão pendente do "
-                "projeto; quando existir, ela orienta e sugere, sem alterar registros.",
-                "info",
-            )
+        st_llm = ia.llm_status()
+        aviso_ia = (
+            f"IA externa (BYOK) ativa: {st_llm['modelo']}. Ela orienta e sugere, sem alterar registros."
+            if st_llm.get("pronto")
+            else f"Resposta por regras locais ({st_llm.get('motivo', 'LLM não configurado')}). "
+            "Configure a chave em .env para usar IA externa (BYOK); ela orienta e sugere, sem alterar registros."
         )
+        self.lay_pagina.addWidget(AlertBox(aviso_ia, "info"))
 
         self.lay_pagina.addWidget(QLabel("Pergunte sobre seus dados"))
         ed_perg = QPlainTextEdit()
@@ -1566,7 +1577,8 @@ class OneWorldWindow(QMainWindow):
             p = ed_perg.toPlainText().strip()
             if not p:
                 return
-            resp = bk.responder_ia(p, self.dados("eventos"), self.dados("convidados"), self.cfg)
+            resp_local = bk.responder_ia(p, self.dados("eventos"), self.dados("convidados"), self.cfg)
+            resp = ia.resposta_com_llm(p, resp_local)
             db.salvar_relatorio(p, resp)
             self.estado["ia_ultima_resposta"] = resp
             self.reconstruir_pagina()
@@ -1945,6 +1957,38 @@ class OneWorldWindow(QMainWindow):
         cap_bkp.setObjectName("Caption")
         l_seg.addWidget(cap_bkp)
         l_seg.addWidget(AlertBox("Chaves de API (BYOK) devem ficar no arquivo .env, nunca no código.", "warning"))
+
+        btn_testar_ia = QPushButton("Testar conexão com a IA")
+        btn_testar_ia.setObjectName("PrimaryBtn")
+        btn_testar_ia.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        def testar_ia():
+            self.estado["ia_teste_resultado"] = ia.testar_conexao()
+            self.reconstruir_pagina()
+
+        btn_testar_ia.clicked.connect(testar_ia)
+        l_seg.addWidget(btn_testar_ia, alignment=Qt.AlignmentFlag.AlignLeft)
+
+        res_ia = self.estado.get("ia_teste_resultado")
+        if res_ia:
+            tipo_res = "success" if res_ia.get("ok") else "danger"
+            l_seg.addWidget(AlertBox(res_ia.get("mensagem", ""), tipo_res))
+            if res_ia.get("ok"):
+                detalhes = (
+                    f"Provedor: {res_ia.get('provedor')} | Modelo: {res_ia.get('modelo')} "
+                    f"| Latência: {res_ia.get('latencia_ms')} ms"
+                )
+                if res_ia.get("tokens") is not None:
+                    detalhes += f" | Tokens: {res_ia.get('tokens')}"
+                lbl_det = QLabel(detalhes)
+                lbl_det.setObjectName("Caption")
+                l_seg.addWidget(lbl_det)
+            icones = {"ok": "✅", "aviso": "⚠️", "erro": "❌"}
+            for nivel, texto in res_ia.get("diagnostico", []):
+                lbl_diag = QLabel(f"{icones.get(nivel, '•')} {texto}")
+                lbl_diag.setWordWrap(True)
+                l_seg.addWidget(lbl_diag)
+
         l_seg.addStretch(1)
         abas.addTab(w_seg, "Segurança")
 
