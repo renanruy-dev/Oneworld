@@ -1,4 +1,4 @@
-# Checklist final — Parte 4 / Prompt 3
+# Checklist final — Parte 4 / conferência final
 
 Atualização de 14/11/2026 disponível em [status da entrega](status_entrega.md). Os registros abaixo preservam suas datas históricas.
 
@@ -6,7 +6,7 @@ Conferência de **27/10/2026** (America/Sao_Paulo). **Parte 4 pronta para revis�
 
 Este é o estado final de referência. O conteúdo anterior está preservado ao final como histórico; suas marcações e contagens não substituem os três grupos atuais. Comece por [leia_primeiro.md](leia_primeiro.md).
 
-## A. Concluído e verificado pelo Codex
+## A. Concluído e verificado
 
 - [x] Conferir os materiais de entrega com os sete módulos técnicos permitidos, a navegação e os componentes compartilhados reutilizados, sem alterá-los; manual compatível com os rótulos e controles atuais.
 - [x] Confirmar **19 fontes** e **61 artefatos** sem divergência SHA-256 em relação ao [manifesto da rodada funcional](evidencias/validacao_20261027/manifesto.json). A evidência de **60 testes aprovados em 9,082 s** permanece aplicável aos arquivos conferidos; não é uma nova execução desta suíte.
@@ -56,7 +56,7 @@ Somente essas decisões/informações e atividades com pessoas impedem os encerr
 <details>
 <summary>Histórico preservado das rodadas anteriores — não usar como estado atual</summary>
 
-# Checklist atual — materiais da Parte 4 / Prompt 2
+# Checklist atual — materiais da Parte 4 / etapa documental
 
 Atualizado em **27/10/2026**. Esta seção é a referência atual de preparação documental. As seções seguintes preservam o histórico das etapas anteriores; afirmações de “última execução” ou “atual” dentro delas se referem à época de cada registro. A referência técnica mais recente é **60 testes aprovados**, conforme [log existente](evidencias/validacao_20261027/testes_finais.txt) e [validação técnica](validacao_tecnica.md). Nesta preparação documental não houve nova execução do aplicativo ou da suíte.
 
@@ -102,9 +102,9 @@ Fonte: [planejamento v2](../oneworld_planejamento_execucao_v2.md). Não foram co
 
 ---
 
-# Histórico — execução anterior do Prompt 1 em 27/10/2026
+# Histórico — execução anterior do etapa técnica em 27/10/2026
 
-Esta seção preserva o registro da rodada técnica anterior ao Prompt 2; os estados documentais atuais estão no início deste arquivo. Referência atual: **60 testes aprovados** em [validação técnica](validacao_tecnica.md), após 56 testes iniciais aprovados.
+Esta seção preserva o registro da rodada técnica anterior ao etapa documental; os estados documentais atuais estão no início deste arquivo. Referência atual: **60 testes aprovados** em [validação técnica](validacao_tecnica.md), após 56 testes iniciais aprovados.
 
 ## a) Concluído e verificado
 
@@ -145,7 +145,7 @@ Não há dependência externa bloqueando os testes e a demonstração local conc
 
 Data da auditoria: **27/10/2026**. A auditoria inicial foi de leitura, sem alteração de código ou banco. **Atualização da Etapa 2, na mesma data:** testes executados, dois defeitos de identidade SQLite corrigidos no frontend de BI e evidências anexadas em [validação técnica](validacao_tecnica.md). Banco e módulos compartilhados preservados.
 
-Base aplicada: contexto mestre (Prompt 0), auditoria (Prompt 1) e critérios do [planejamento v2](../oneworld_planejamento_execucao_v2.md). O OneWorld é BI genérico local; a Casa Grande Eventos é parceira de validação, não domínio obrigatório. Não foi localizado um arquivo separado chamado prompt-base nesta cópia.
+Base aplicada: contexto mestre (contexto inicial), auditoria (etapa técnica) e critérios do [planejamento v2](../oneworld_planejamento_execucao_v2.md). O OneWorld é BI genérico local; a Casa Grande Eventos é parceira de validação, não domínio obrigatório. Não foi localizado um arquivo separado chamado prompt-base nesta cópia.
 
 ## Como interpretar os estados
 

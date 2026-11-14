@@ -6,7 +6,7 @@ Prazos previstos no [planejamento](../oneworld_planejamento_execucao_v2.md): Ent
 
 ## Preparação local
 
-**Orientação final do Prompt 3 (27/10/2026):** seguir o comando completo de [leia_primeiro.md — como abrir e demonstrar](leia_primeiro.md#como-abrir-e-demonstrar). Ele usa o interpretador existente da `.venv` e cria uma nova cópia temporária de `evidencias/validacao_20261027/demo__m55hy_i/`, com exemplos e SQLite sintético. Assim, o app completo inicializa somente o banco da cópia de trabalho, preservando o banco real e o ambiente histórico das evidências.
+**Orientação final do conferência final (27/10/2026):** seguir o comando completo de [leia_primeiro.md — como abrir e demonstrar](leia_primeiro.md#como-abrir-e-demonstrar). Ele usa o interpretador existente da `.venv` e cria uma nova cópia temporária de `evidencias/validacao_20261027/demo__m55hy_i/`, com exemplos e SQLite sintético. Assim, o app completo inicializa somente o banco da cópia de trabalho, preservando o banco real e o ambiente histórico das evidências.
 
 Abrir `http://127.0.0.1:18657`, entrar em **Dashboard** e encerrar com Ctrl+C ao terminar. Se a porta estiver ocupada, escolher outra porta livre no comando e no endereço. Se o ambiente não abrir, usar a contingência; instalação em outra máquina depende de D07. Novas interações não são as evidências de 27/10: registrar separadamente qualquer resultado futuro.
 

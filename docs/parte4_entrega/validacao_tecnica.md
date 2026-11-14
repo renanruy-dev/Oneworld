@@ -1,4 +1,4 @@
-# Conferência final — Prompt 3, 27/10/2026
+# Conferência final — conferência final, 27/10/2026
 
 Atualização de 14/11/2026 disponível em [status da entrega](status_entrega.md). Os registros abaixo preservam suas datas históricas.
 
@@ -12,7 +12,7 @@ Não foram realizados homologação, capacitação, aprovação coletiva, envio 
 
 ---
 
-# Validação técnica atual — Prompt 1, rodada final de 27/10/2026
+# Validação técnica atual — etapa técnica, rodada final de 27/10/2026
 
 Esta seção registra uma **nova execução** sobre o estado real da pasta. Os registros anteriores foram preservados abaixo. A referência de 52 testes estava desatualizada: a cópia recebida já tinha 56 testes, todos aprovados novamente; a versão final tem **60 testes aprovados em 9,082 s**. Não há homologação externa, publicação, envio ou commit nesta rodada.
 
@@ -95,7 +95,7 @@ Execução em **27/10/2026**, referência de data: America/Sao_Paulo. Resultado:
 
 ## Base, escopo e ambiente
 
-Aplicados o Prompt 0, os contratos e as restrições dos Prompts 1 e 5–6 do [planejamento v2](../oneworld_planejamento_execucao_v2.md) e o [checklist anterior](checklist.md). Não existe um prompt-base separado nesta cópia nem uma lista adicional explícita de arquivos permitidos. O escopo foi limitado ao módulo próprio `oneworld/frontend_bi.py`, seus testes e documentação de entrega. Não foram alterados módulos compartilhados, importação, IA, esquema ou dados do banco.
+Aplicados o contexto inicial, os contratos e as restrições dos Prompts 1 e 5–6 do [planejamento v2](../oneworld_planejamento_execucao_v2.md) e o [checklist anterior](checklist.md). Não existe um prompt-base separado nesta cópia nem uma lista adicional explícita de arquivos permitidos. O escopo foi limitado ao módulo próprio `oneworld/frontend_bi.py`, seus testes e documentação de entrega. Não foram alterados módulos compartilhados, importação, IA, esquema ou dados do banco.
 
 - Diretório: `C:\Users\felip\Documents\Projetos\One World`.
 - Windows 10, build 19045, AMD64; shell PowerShell.

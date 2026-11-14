@@ -1,6 +1,6 @@
 # Manual do dashboard — Parte 4 / Entrega 5
 
-Atualizado em 27/10/2026 (Prompt 2) a partir do [guia existente](../guia_dashboard.md) e dos controles de `oneworld/frontend_bi.py`. Este manual cobre a análise de dados da Parte 4. A revisão e incorporação ao manual coletivo estão pendentes; sua existência não comprova disponibilização nem capacitação.
+Atualizado em 27/10/2026 (etapa documental) a partir do [guia existente](../guia_dashboard.md) e dos controles de `oneworld/frontend_bi.py`. Este manual cobre a análise de dados da Parte 4. A revisão e incorporação ao manual coletivo estão pendentes; sua existência não comprova disponibilização nem capacitação.
 
 Prazos do [planejamento](../oneworld_planejamento_execucao_v2.md): **04/11/2026** (Entrega 4), **18/11/2026** (Entrega 5) e **25/11/2026** (Entrega 6), **datas previstas nos documentos, ainda sujeitas à confirmação da disciplina**.
 

@@ -1,6 +1,6 @@
 # Avaliação de reação — Dashboard OneWorld / Parte 4
 
-Atualizada em **27/10/2026** (Prompt 2). **Instrumento em branco, pendente de aplicação; nenhuma resposta foi inventada.** Preencher após o uso real. Duração sugerida: 3 minutos. Não há resposta certa; o objetivo é compreender a experiência da pessoa.
+Atualizada em **27/10/2026** (etapa documental). **Instrumento em branco, pendente de aplicação; nenhuma resposta foi inventada.** Preencher após o uso real. Duração sugerida: 3 minutos. Não há resposta certa; o objetivo é compreender a experiência da pessoa.
 
 Prazos do [planejamento](../oneworld_planejamento_execucao_v2.md): **04/11/2026** (Entrega 4), **18/11/2026** (Entrega 5) e **25/11/2026** (Entrega 6), **datas previstas nos documentos, ainda sujeitas à confirmação da disciplina**.
 

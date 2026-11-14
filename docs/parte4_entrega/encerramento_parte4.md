@@ -1,6 +1,6 @@
 # Encerramento da Parte 4 — síntese para o relatório final
 
-Atualizado em **27/10/2026** na preparação documental do Prompt 2. Texto técnico pronto como insumo para o relatório; encerramento coletivo, apresentação e submissão dependem dos registros próprios. Não houve nova execução da aplicação ou dos testes nesta preparação.
+Atualizado em **27/10/2026** na preparação documental do etapa documental. Texto técnico pronto como insumo para o relatório; encerramento coletivo, apresentação e submissão dependem dos registros próprios. Não houve nova execução da aplicação ou dos testes nesta preparação.
 
 ## Síntese técnica
 

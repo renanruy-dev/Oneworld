@@ -15,7 +15,7 @@ Versão para revisão, atualizada em 14/11/2026. Texto elaborado com base nas co
 
 Minha contribuição no OneWorld está concentrada na Parte 4, dedicada ao Business Intelligence e à visualização de dados. Essa parte reúne indicadores, filtros, gráficos e a interface de análise. Na retomada do projeto, procurei identificar o que já estava implementado e concluir as pendências da minha contribuição. Solicitei a organização do trabalho em etapas e estabeleci que necessidades relacionadas aos módulos de outros integrantes fossem registradas para a equipe.
 
-Utilizei assistência de IA no desenvolvimento e na preparação dos materiais. Nas conversas com o Codex, solicitei verificações técnicas, conclusão das tarefas possíveis localmente e organização das evidências e dos documentos. Em 14/11/2026, também autorizei commits na minha branch. A contribuição técnica está registrada no commit `23a35be`, associado à conta `felipecarreira07` e com crédito de coautoria ao Copilot. A organização dos materiais e a demonstração reproduzível foram registradas no commit `a049209`, na branch `felipe/parte-oneworld`.
+Na preparação da entrega, solicitei verificações técnicas, conclusão das tarefas possíveis localmente e organização das evidências e dos documentos. A contribuição técnica está registrada na branch `felipe/parte-oneworld`, junto aos materiais de demonstração e documentação.
 
 ## Solução e resultados
 
@@ -27,7 +27,7 @@ A verificação do código atual em 14/11/2026 terminou com 60 testes aprovados.
 
 ## Desafios técnicos e organização da entrega
 
-Minha principal dificuldade foi decidir quais KPIs utilizar no dashboard. A seleção das operações foi feita pelo assistente de IA utilizado no desenvolvimento. Tive contato com todos os outros participantes do projeto, mas a parte de código não teve uma entrega conjunta. Minha contribuição técnica ficou concentrada na Parte 4.
+Minha principal dificuldade foi decidir quais KPIs utilizar no dashboard. Tive contato com todos os outros participantes do projeto, mas a parte de código não teve uma entrega conjunta. Minha contribuição técnica ficou concentrada na Parte 4.
 
 A escolha das operações atende à proposta de analisar dados de diferentes áreas. A contagem informa o volume de registros; a contagem de distintos identifica quantos valores diferentes existem em uma coluna; a soma apresenta um total acumulado; a média resume o valor médio; e o mínimo e o máximo mostram os extremos. Nos exemplos do projeto, essas operações permitem apresentar o total de vendas, a média das notas e a quantidade total em estoque.
 

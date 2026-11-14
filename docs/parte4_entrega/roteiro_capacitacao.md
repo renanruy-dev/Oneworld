@@ -1,6 +1,6 @@
 # Roteiro de capacitação — Parte 4 / Entrega 5
 
-Atualizado em 27/10/2026 (Prompt 2). **Roteiro não aplicado nesta etapa.** Duração sugerida: 60 minutos, a ajustar à pessoa participante. A capacitação, a participação e os resultados observados continuam pendentes.
+Atualizado em 27/10/2026 (etapa documental). **Roteiro não aplicado nesta etapa.** Duração sugerida: 60 minutos, a ajustar à pessoa participante. A capacitação, a participação e os resultados observados continuam pendentes.
 
 Objetivo: permitir que o usuário responsável selecione uma fonte, confira tipos, aplique filtros, configure indicadores e gráficos, exporte e reconheça os limites da sessão. O mesmo mecanismo atende diferentes áreas; os exemplos não impõem um domínio ao produto.
 

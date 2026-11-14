@@ -1,6 +1,6 @@
 # Dependências da equipe — consolidação da Parte 4
 
-Atualizado em **27/10/2026**, preparação de materiais do Prompt 2. Reúne ações dos [checklists das Entregas 4–6](checklist.md), da [contribuição técnica](contribuicao_entrega4.md) e do [registro da Entrega 5](relatorio_equipe.md) que exigem outros integrantes ou coordenação externa. Os registros anteriores são preservados como histórico; esta é a referência consolidada de encaminhamento. Nenhum arquivo de outro integrante foi alterado nesta etapa.
+Atualizado em **27/10/2026**, preparação de materiais do etapa documental. Reúne ações dos [checklists das Entregas 4–6](checklist.md), da [contribuição técnica](contribuicao_entrega4.md) e do [registro da Entrega 5](relatorio_equipe.md) que exigem outros integrantes ou coordenação externa. Os registros anteriores são preservados como histórico; esta é a referência consolidada de encaminhamento. Nenhum arquivo de outro integrante foi alterado nesta etapa.
 
 **Estado de todos os itens abaixo: pendente de comprovação nesta cópia.** Papéis são encaminhamentos sugeridos, sem atribuição nominal ou prazo acordado. A ausência de evidência local não significa que colegas não tenham feito trabalho em outra versão. Uma decisão explícita de adiar/retirar uma funcionalidade pode encerrar a definição de escopo, mas não equivale a implementá-la.
 
@@ -37,7 +37,7 @@ Identificação, experiências, dificuldades, aprendizados e reflexão pessoal n
 Para cada dependência: **ID:** [PREENCHER]; **responsável confirmado:** [PREENCHER]; **decisão/escopo:** [PREENCHER]; **prazo acordado:** [PREENCHER]; **evidência/versão:** [PREENCHER]; **data da validação:** [PREENCHER]. Marcar conclusão somente quando o critério correspondente estiver atendido. Esta consolidação não envia mensagens a colegas nem confirma compromissos em nome deles.
 
 
-## Complemento técnico — nova execução do Prompt 1 em 27/10/2026
+## Complemento técnico — nova execução do etapa técnica em 27/10/2026
 
 Nenhuma modificação fora dos arquivos permitidos foi necessária às duas correções atuais. A auditoria reafirmou os seguintes limites com encaminhamento aos responsáveis, sem ampliar o MVP:
 

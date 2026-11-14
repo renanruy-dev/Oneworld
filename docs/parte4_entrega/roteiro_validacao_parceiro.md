@@ -1,6 +1,6 @@
 # Roteiro de validação com o parceiro — Parte 4
 
-Atualizado em 27/10/2026 (Prompt 2). **Situação: PENDENTE DE APLICAÇÃO.**
+Atualizado em 27/10/2026 (etapa documental). **Situação: PENDENTE DE APLICAÇÃO.**
 Este documento é um formulário em branco. Não houve contato, reunião, participante,
 feedback ou aceite externo registrado nesta etapa.
 

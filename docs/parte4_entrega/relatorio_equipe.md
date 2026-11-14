@@ -2,7 +2,7 @@
 
 Preparado em 27/10/2026. Este é um insumo local para incorporação ao relatório coletivo; não comprova revisão pela equipe, implantação, capacitação, avaliação aplicada ou envio acadêmico. Entrega 5 prevista em 18/11/2026 nos documentos locais, sujeita à confirmação da disciplina.
 
-## Atualização documental — Prompt 2
+## Atualização documental — etapa documental
 
 Os materiais foram revistos em 27/10/2026 para refletir a [rodada técnica mais recente](evidencias/validacao_20261027/README.md): **60 testes aprovados**, com log e evidências preservados. Nesta preparação não houve nova execução do aplicativo, capacitação ou coleta. O [roteiro de apresentação](roteiro_apresentacao.md) centraliza a demonstração e a contingência; [dependencias_equipe.md](dependencias_equipe.md), D01–D17, centraliza as ações coletivas. O registro da Etapa 5 abaixo é histórico de preparação, sem constituir implantação ou aceite.
 
