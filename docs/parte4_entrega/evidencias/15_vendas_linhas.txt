@@ -1,0 +1,236 @@
+Browser tab: 1, Title: "OneWorld", URL: "http://127.0.0.1:18653/".
+1 AXWebArea OneWorld, URL: 127.0.0.1:18653/
+	2 container
+		3 text 5 options available.
+		4 container
+			5 link Description: Skip to main content, Value: 127.0.0.1:18653/#stMain
+			6 container Description: Sidebar, ID: stSidebar
+				7 container
+					8 container
+						9 button Fullscreen
+						10 image
+					11 text Gerência e análise em um só mundo
+					12 Description: Navegação, ID: react-aria6062310514-:r4:
+						13 container
+							14 radio button (settable, integer) Description: Dashboard, Value: 1
+							15 text Dashboard
+						16 container
+							17 radio button (settable, integer) Description: Eventos, Value: 0
+							18 text Eventos
+						19 container
+							20 radio button (settable, integer) Description: Convidados & Planilhas, Value: 0
+							21 text Convidados & Planilhas
+						22 container
+							23 radio button (settable, integer) Description: Dados Externos, Value: 0
+							24 text Dados Externos
+						25 container
+							26 radio button (settable, integer) Description: Orientação IA, Value: 0
+							27 text Orientação IA
+						28 container
+							29 radio button (settable, integer) Description: Anotações, Value: 0
+							30 text Anotações
+						31 container
+							32 radio button (settable, integer) Description: Configurações, Value: 0
+							33 text Configurações
+					34 text Ambiente
+					35 text Modo: local
+					36 text Banco: SQLite
+					37 text Status: operacional
+			38 container
+				39 button (collapsed) Description: Expand sidebar, Secondary Actions: Expand
+				40 button Deploy
+				41 pop up button (collapsed) Description: Main menu, Secondary Actions: Expand
+			42 container stMain
+				43 container
+					44 text Dashboard Análise configurável de conjuntos de dados
+				45 text Escolha os dados e configure a análise. Arquivos e configurações da análise ficam nesta sessão local.
+				46 container
+					47 container Adicionar conjuntos de dados (CSV, XLSX ou JSON)
+						48 button file upload
+						49 button Upload
+							50 text Upload
+						51 text 200MB per file
+						52 text  • CSV, XLSX, JSON
+				53 container
+					54 checkbox (settable, integer) Description: Incluir tabelas do banco local, Value: 1
+					55 text Incluir tabelas do banco local
+				56 container
+					57 combo box (collapsed, settable) Description: Conjunto de dados, Value: Exemplo: vendas, ID: react-aria6062310514-:rq:, Secondary Actions: Expand
+					58 pop up button (collapsed) Description: Open, ID: react-aria6062310514-:rm:, Secondary Actions: Expand
+				59 container
+					60 button (expanded) Tipos de colunas e datas, Secondary Actions: Collapse
+						61 text Tipos de colunas e datas
+					62 container
+						63 button Show/hide columns
+						64 button Download as CSV
+						65 button Search
+						66 button Fullscreen
+						67 container
+							68 image
+								69 table
+									70 row nome tipo nulos
+										71 cell (selectable) nome
+										72 cell (selectable) tipo
+										73 cell (selectable) nulos
+									74 container
+										75 row (selectable) produto categoria 0
+											76 cell (selectable) Value: produto, ID: glide-cell-0-0
+											77 cell (selectable) Value: categoria, ID: glide-cell-1-0
+											78 cell (selectable) Value: 0, ID: glide-cell-2-0
+										79 row (selectable) categoria categoria 0
+											80 cell (selectable) Value: categoria, ID: glide-cell-0-1
+											81 cell (selectable) Value: categoria, ID: glide-cell-1-1
+											82 cell (selectable) Value: 0, ID: glide-cell-2-1
+										83 row (selectable) valor numero 0
+											84 cell (selectable) Value: valor, ID: glide-cell-0-2
+											85 cell (selectable) Value: numero, ID: glide-cell-1-2
+											86 cell (selectable) Value: 0, ID: glide-cell-2-2
+										87 row (selectable) data categoria 0
+											88 cell (selectable) Value: data, ID: glide-cell-0-3
+											89 cell (selectable) Value: categoria, ID: glide-cell-1-3
+											90 cell (selectable) Value: 0, ID: glide-cell-2-3
+							91 image
+					92 container
+						93 container Selected values
+							94 container data
+								95 text data
+								96 button Remove data
+						97 combo box (collapsed, settable) Description: Interpretar colunas como data, ID: react-aria6062310514-:roe:, Secondary Actions: Expand
+						98 button Description: Clear all, ID: react-aria6062310514-:rtf:
+						99 pop up button (collapsed) Description: Open, ID: react-aria6062310514-:roa:, Secondary Actions: Expand
+					100 container
+						101 button Help for Formato das datas
+						102 text field (settable) Description: Formato das datas, Value: %Y-%m-%d, ID: :rth:
+				103 button (collapsed) Filtros dinâmicos, Secondary Actions: Expand
+					104 text Filtros dinâmicos
+				105 text 4 de 4 registros após os filtros.
+				106 heading KPIs configuráveis, Value: 3, ID: kpis-configuraveis
+					107 text KPIs configuráveis
+					108 link Description: Link to heading, Value: 127.0.0.1:18653/#kpis-configuraveis
+				109 container
+					110 stepper (settable, integer) Description: Quantidade de KPIs, Value: 1, ID: :rp1:
+					111 button (disabled) Decrement
+					112 button Increment
+				113 container
+					114 button (expanded) Configurar KPI 1, Secondary Actions: Collapse
+						115 text Configurar KPI 1
+					116 container
+						117 combo box (collapsed, settable) Description: Operação, Value: Soma, ID: react-aria6062310514-:rpc:, Secondary Actions: Expand
+						118 pop up button (collapsed) Description: Open, ID: react-aria6062310514-:rp8:, Secondary Actions: Expand
+					119 container
+						120 combo box (collapsed, settable) Description: Coluna do KPI, Value: valor, ID: react-aria6062310514-:rsk:, Secondary Actions: Expand
+						121 pop up button (collapsed) Description: Open, ID: react-aria6062310514-:rsg:, Secondary Actions: Expand
+					122 container
+						123 text field (settable) Description: Título do KPI, Value: KPI 1, ID: :rpl:
+					124 container
+						125 combo box (collapsed, settable) Description: Apresentação, Value: Número, ID: react-aria6062310514-:rq0:, Secondary Actions: Expand
+						126 pop up button (collapsed) Description: Open, ID: react-aria6062310514-:rps:, Secondary Actions: Expand
+				127 container
+					128 text KPI 1
+					129 text 450
+				130 heading Gráfico configurável, Value: 3, ID: grafico-configuravel
+					131 text Gráfico configurável
+					132 link Description: Link to heading, Value: 127.0.0.1:18653/#grafico-configuravel
+				133 container
+					134 combo box (collapsed, settable) Description: Tipo de gráfico, Value: linhas, ID: react-aria6062310514-:rqe:, Secondary Actions: Expand
+					135 pop up button (collapsed) Description: Open, ID: react-aria6062310514-:rqa:, Secondary Actions: Expand
+				136 container
+					137 combo box (collapsed, settable) Description: Agrupar por, Value: data, ID: react-aria6062310514-:rud:, Secondary Actions: Expand
+					138 pop up button (collapsed) Description: Open, ID: react-aria6062310514-:ru9:, Secondary Actions: Expand
+				139 container
+					140 combo box (collapsed, settable) Description: Agregação, Value: Soma, ID: react-aria6062310514-:rra:, Secondary Actions: Expand
+					141 pop up button (collapsed) Description: Open, ID: react-aria6062310514-:rr6:, Secondary Actions: Expand
+				142 container
+					143 combo box (collapsed, settable) Description: Medida, Value: valor, ID: react-aria6062310514-:r10p:, Secondary Actions: Expand
+					144 pop up button (collapsed) Description: Open, ID: react-aria6062310514-:r10l:, Secondary Actions: Expand
+				145 container
+					146 combo box (collapsed, settable) Description: Período, Value: dia, ID: react-aria6062310514-:r117:, Secondary Actions: Expand
+					147 pop up button (collapsed) Description: Open, ID: react-aria6062310514-:r113:, Secondary Actions: Expand
+				148 container
+					149 button Show data
+					150 button Download as PNG
+					151 button Copy Vega-Lite spec
+					152 button Fullscreen
+					153 container Vega visualization
+						154 image
+							155 container X-axis titled 'grupo' for a time scale with values from Thursday, 01 October 2026, 12:00:00 AM to Sunday, 04 October 2026, 12:00:00 AM Y-axis titled 'valor' for a linear scale with values from 0 to 200 grupo: Oct 01, 2026; valor: 100grupo: Oct 01, 2026; valor: 100 grupo: Oct 02, 2026; valor: 200 grupo: Oct 03, 2026; valor: 100 grupo: Oct 04, 2026; valor: 50
+								156 axis X-axis titled 'grupo' for a time scale with values from Thursday, 01 October 2026, 12:00:00 AM to Sunday, 04 October 2026, 12:00:00 AM
+								157 axis Y-axis titled 'valor' for a linear scale with values from 0 to 200
+								158 container grupo: Oct 01, 2026; valor: 100
+									159 line mark grupo: Oct 01, 2026; valor: 100
+								160 container grupo: Oct 01, 2026; valor: 100 grupo: Oct 02, 2026; valor: 200 grupo: Oct 03, 2026; valor: 100 grupo: Oct 04, 2026; valor: 50
+									161 point grupo: Oct 01, 2026; valor: 100
+									162 point grupo: Oct 02, 2026; valor: 200
+									163 point grupo: Oct 03, 2026; valor: 100
+									164 point grupo: Oct 04, 2026; valor: 50
+								165 symbol mark container
+				166 container
+					167 button (expanded) Dados do gráfico, Secondary Actions: Collapse
+						168 text Dados do gráfico
+					169 container
+						170 button Show/hide columns
+						171 button Download as CSV
+						172 button Search
+						173 button Fullscreen
+						174 container
+							175 image
+								176 table
+									177 row grupo valor
+										178 cell (selectable) grupo
+										179 cell (selectable) valor
+									180 container
+										181 row (selectable) 2026-10-01 00:00:00 100
+											182 cell (selectable) Value: 2026-10-01 00:00:00, ID: glide-cell-0-0
+											183 cell (selectable) Value: 100, ID: glide-cell-1-0
+										184 row (selectable) 2026-10-02 00:00:00 200
+											185 cell (selectable) Value: 2026-10-02 00:00:00, ID: glide-cell-0-1
+											186 cell (selectable) Value: 200, ID: glide-cell-1-1
+										187 row (selectable) 2026-10-03 00:00:00 100
+											188 cell (selectable) Value: 2026-10-03 00:00:00, ID: glide-cell-0-2
+											189 cell (selectable) Value: 100, ID: glide-cell-1-2
+										190 row (selectable) 2026-10-04 00:00:00 50
+											191 cell (selectable) Value: 2026-10-04 00:00:00, ID: glide-cell-0-3
+											192 cell (selectable) Value: 50, ID: glide-cell-1-3
+							193 image
+				194 heading Registros filtrados, Value: 3, ID: registros-filtrados
+					195 text Registros filtrados
+					196 link Description: Link to heading, Value: 127.0.0.1:18653/#registros-filtrados
+				197 container
+					198 button Show/hide columns
+					199 button Download as CSV
+					200 button Search
+					201 button Fullscreen
+					202 container
+						203 image
+							204 table
+								205 row produto categoria valor data
+									206 cell (selectable) produto
+									207 cell (selectable) categoria
+									208 cell (selectable) valor
+									209 cell (selectable) data
+								210 container
+									211 row (selectable) Caneta Papelaria 100 2026-10-01 00:00:00
+										212 cell (selectable) Value: Caneta, ID: glide-cell-0-0
+										213 cell (selectable) Value: Papelaria, ID: glide-cell-1-0
+										214 cell (selectable) Value: 100, ID: glide-cell-2-0
+										215 cell (selectable) Value: 2026-10-01 00:00:00, ID: glide-cell-3-0
+									216 row (selectable) Livro Leitura 200 2026-10-02 00:00:00
+										217 cell (selectable) Value: Livro, ID: glide-cell-0-1
+										218 cell (selectable) Value: Leitura, ID: glide-cell-1-1
+										219 cell (selectable) Value: 200, ID: glide-cell-2-1
+										220 cell (selectable) Value: 2026-10-02 00:00:00, ID: glide-cell-3-1
+									221 row (selectable) Caneta Papelaria 100 2026-10-03 00:00:00
+										222 cell (selectable) Value: Caneta, ID: glide-cell-0-2
+										223 cell (selectable) Value: Papelaria, ID: glide-cell-1-2
+										224 cell (selectable) Value: 100, ID: glide-cell-2-2
+										225 cell (selectable) Value: 2026-10-03 00:00:00, ID: glide-cell-3-2
+									226 row (selectable) Borracha Papelaria 50 2026-10-04 00:00:00
+										227 cell (selectable) Value: Borracha, ID: glide-cell-0-3
+										228 cell (selectable) Value: Papelaria, ID: glide-cell-1-3
+										229 cell (selectable) Value: 50, ID: glide-cell-2-3
+										230 cell (selectable) Value: 2026-10-04 00:00:00, ID: glide-cell-3-3
+				231 button Exportar dados filtrados
+					232 text Exportar dados filtrados
+				233 text OneWorld — Protótipo 02 · dados em SQLite local · IA simulada nesta versão.
+
+The focused UI element is 167 button (expanded) Dados do gráfico, Secondary Actions: Collapse

@@ -1,0 +1,60 @@
+{
+  "data": "2026-10-27",
+  "timezone": "America/Sao_Paulo",
+  "python": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+  "streamlit": "1.66.0",
+  "pandas": "3.0.6",
+  "csv_baixado": {
+    "arquivo": "educacao_turma_A_download.csv",
+    "linhas": 2,
+    "media_nota": 7.0,
+    "igual_tabela_esperada": true,
+    "registros": [
+      {
+        "aluno": "Ana",
+        "turma": "A",
+        "nota": 8
+      },
+      {
+        "aluno": "Bruno",
+        "turma": "A",
+        "nota": 6
+      }
+    ],
+    "sha256": "2ee6e9fcd066277dd4427fce2404d623904c06d4aa8b36d3d138730c280ecf9f"
+  },
+  "arquivos_preexistentes_modificados": [
+    "oneworld\\frontend_bi.py",
+    "tests\\test_frontend_bi.py"
+  ],
+  "banco_original_preservado": true,
+  "copia_bi_identica_original": true,
+  "sqlite_teste": [
+    [
+      "Item 1",
+      "A",
+      12
+    ],
+    [
+      "Item 2",
+      "A",
+      30
+    ],
+    [
+      "Item 3",
+      "B",
+      5
+    ]
+  ],
+  "compilacao": "python -m compileall -q oneworld tests app.py: exit 0",
+  "testes_finais": {
+    "total": 56,
+    "resultado": "OK",
+    "duracao_segundos": 6.924
+  },
+  "correcoes": [
+    "ordem numerica do eixo do histograma",
+    "identidade dos widgets apos limpar filtros"
+  ],
+  "servidor": "encerrado apos inspecao"
+}

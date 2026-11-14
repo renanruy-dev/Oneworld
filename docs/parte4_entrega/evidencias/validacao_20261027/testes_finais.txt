@@ -1,0 +1,85 @@
+test_and_inclusivo_sem_mutacao (test_bi.TestFiltros.test_and_inclusivo_sem_mutacao) ... ok
+test_dia_final_completo_e_fuso (test_bi.TestFiltros.test_dia_final_completo_e_fuso) ... ok
+test_erros_de_configuracao (test_bi.TestFiltros.test_erros_de_configuracao) ... ok
+test_indices_duplicados (test_bi.TestFiltros.test_indices_duplicados) ... ok
+test_limpar_filtros (test_bi.TestFiltros.test_limpar_filtros) ... ok
+test_selecao_vazia_e_nulos (test_bi.TestFiltros.test_selecao_vazia_e_nulos) ... ok
+test_barras (test_bi.TestGraficos.test_barras) ... ok
+test_categorias_textuais_e_booleanas_no_mesmo_grupo (test_bi.TestGraficos.test_categorias_textuais_e_booleanas_no_mesmo_grupo) ... ok
+test_entrada_preservada (test_bi.TestGraficos.test_entrada_preservada) ... ok
+test_erros (test_bi.TestGraficos.test_erros) ... ok
+test_histograma_constante (test_bi.TestGraficos.test_histograma_constante) ... ok
+test_histograma_inclui_extremos (test_bi.TestGraficos.test_histograma_inclui_extremos) ... ok
+test_intervalo_preserva_inteiros_grandes (test_bi.TestGraficos.test_intervalo_preserva_inteiros_grandes) ... ok
+test_soma_preserva_inteiros_nullable_grandes (test_bi.TestGraficos.test_soma_preserva_inteiros_nullable_grandes) ... ok
+test_temporal_ordenado (test_bi.TestGraficos.test_temporal_ordenado) ... ok
+test_vazios (test_bi.TestGraficos.test_vazios) ... ok
+test_mesmo_fluxo_em_tres_dominios (test_bi.TestIndependenciaDominio.test_mesmo_fluxo_em_tres_dominios) ... ok
+test_booleanos_nao_sao_medidas (test_bi.TestKPIs.test_booleanos_nao_sao_medidas) ... ok
+test_complexos_nao_sao_medidas (test_bi.TestKPIs.test_complexos_nao_sao_medidas) ... ok
+test_configuracoes_invalidas (test_bi.TestKPIs.test_configuracoes_invalidas) ... ok
+test_infinitos_e_overflow (test_bi.TestKPIs.test_infinitos_e_overflow) ... ok
+test_operacoes (test_bi.TestKPIs.test_operacoes) ... ok
+test_sem_conversao_silenciosa (test_bi.TestKPIs.test_sem_conversao_silenciosa) ... ok
+test_vazios_e_nulos (test_bi.TestKPIs.test_vazios_e_nulos) ... ok
+test_colunas_invalidas (test_bi.TestMetadados.test_colunas_invalidas) ... ok
+test_formato_data_invalido_retorna_erro_bi (test_bi.TestMetadados.test_formato_data_invalido_retorna_erro_bi) ... ok
+test_tipos_e_datas_explicitas (test_bi.TestMetadados.test_tipos_e_datas_explicitas) ... ok
+test_conexao_bi_recusa_escrita (test_fontes_sqlite.TestFontesSQLite.test_conexao_bi_recusa_escrita) ... ok
+test_dashboard_blob_e_atualizacao_real_pequena (test_fontes_sqlite.TestFontesSQLite.test_dashboard_blob_e_atualizacao_real_pequena) ... 2026-10-27 13:13:26.632 WARNING streamlit.runtime.scriptrunner_utils.script_run_context: Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_dashboard_reflete_banco_filtros_e_retorno_a_exemplos (test_fontes_sqlite.TestFontesSQLite.test_dashboard_reflete_banco_filtros_e_retorno_a_exemplos) ... 2026-10-27 13:13:27.782 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_leitura_sem_alterar_banco_e_sem_criar_arquivo (test_fontes_sqlite.TestFontesSQLite.test_leitura_sem_alterar_banco_e_sem_criar_arquivo) ... ok
+test_nomes_de_tabela_sao_identificadores (test_fontes_sqlite.TestFontesSQLite.test_nomes_de_tabela_sao_identificadores) ... ok
+test_datas_histograma_e_multiplos_kpis (test_frontend_bi.TestDashboard.test_datas_histograma_e_multiplos_kpis) ... 2026-10-27 13:13:28.518 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_filtros_combinados_exportacao_e_limpeza_sem_ia (test_frontend_bi.TestDashboard.test_filtros_combinados_exportacao_e_limpeza_sem_ia) ... 2026-10-27 13:13:29.358 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_formato_data_invalido_e_recuperacao (test_frontend_bi.TestDashboard.test_formato_data_invalido_e_recuperacao) ... 2026-10-27 13:13:30.581 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_histograma_preserva_ordem_numerica_no_eixo (test_frontend_bi.TestDashboard.test_histograma_preserva_ordem_numerica_no_eixo) ... 2026-10-27 13:13:30.916 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_inicializacao_e_troca_dataset (test_frontend_bi.TestDashboard.test_inicializacao_e_troca_dataset) ... 2026-10-27 13:13:31.207 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_kpi_grafico_e_filtro_atualizados (test_frontend_bi.TestDashboard.test_kpi_grafico_e_filtro_atualizados) ... 2026-10-27 13:13:31.492 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_limites_invertidos_mostram_mensagem (test_frontend_bi.TestDashboard.test_limites_invertidos_mostram_mensagem) ... 2026-10-27 13:13:31.981 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_titulo_e_apresentacao_explicitos (test_frontend_bi.TestDashboard.test_titulo_e_apresentacao_explicitos) ... 2026-10-27 13:13:32.257 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_troca_descarta_todas_as_configuracoes_antigas (test_frontend_bi.TestDashboard.test_troca_descarta_todas_as_configuracoes_antigas) ... 2026-10-27 13:13:32.685 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_arquivos_invalidos (test_frontend_bi.TestUploads.test_arquivos_invalidos) ... 2026-10-27 13:13:33.385 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-10-27 13:13:33.560 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-10-27 13:13:33.745 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_arquivos_validos (test_frontend_bi.TestUploads.test_arquivos_validos) ... 2026-10-27 13:13:34.182 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-10-27 13:13:34.403 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-10-27 13:13:34.659 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_filtro_de_inteiros_grandes (test_frontend_bi.TestUploads.test_filtro_de_inteiros_grandes) ... 2026-10-27 13:13:34.942 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_configuracoes_malformadas_retornam_erro (test_indicadores.TestContratoKPI.test_configuracoes_malformadas_retornam_erro) ... ok
+test_contagem_inclui_linhas_nulas_e_indices_duplicados (test_indicadores.TestContratoKPI.test_contagem_inclui_linhas_nulas_e_indices_duplicados) ... ok
+test_dados_e_configuracao_preservados_com_nomes_arbitrarios (test_indicadores.TestContratoKPI.test_dados_e_configuracao_preservados_com_nomes_arbitrarios) ... ok
+test_dataframe_invalido_retornado_como_erro (test_indicadores.TestContratoKPI.test_dataframe_invalido_retornado_como_erro) ... ok
+test_distintos_em_tipos_compativeis_ignora_nulos (test_indicadores.TestContratoKPI.test_distintos_em_tipos_compativeis_ignora_nulos) ... ok
+test_dtypes_numericos_e_resultados_serializaveis (test_indicadores.TestContratoKPI.test_dtypes_numericos_e_resultados_serializaveis) ... ok
+test_nulos_e_infinitos_sem_valores_validos (test_indicadores.TestContratoKPI.test_nulos_e_infinitos_sem_valores_validos) ... ok
+test_overflow_float_retorna_erro (test_indicadores.TestContratoKPI.test_overflow_float_retorna_erro) ... C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\numpy\_core\_methods.py:49: RuntimeWarning: overflow encountered in reduce
+  return umr_sum(a, axis, dtype, out, keepdims, initial, where)
+ok
+test_precisao_de_inteiros_nullable (test_indicadores.TestContratoKPI.test_precisao_de_inteiros_nullable) ... ok
+test_sem_registros_apos_filtros (test_indicadores.TestContratoKPI.test_sem_registros_apos_filtros) ... ok
+test_validacao_de_coluna_e_tipo_em_todas_as_operacoes (test_indicadores.TestContratoKPI.test_validacao_de_coluna_e_tipo_em_todas_as_operacoes) ... ok
+test_apresentacao_independente_do_calculo (test_indicadores.TestFormatacaoKPI.test_apresentacao_independente_do_calculo) ... ok
+test_erros_de_apresentacao (test_indicadores.TestFormatacaoKPI.test_erros_de_apresentacao) ... ok
+test_zero_indisponibilidade_e_inteiros_grandes (test_indicadores.TestFormatacaoKPI.test_zero_indisponibilidade_e_inteiros_grandes) ... ok
+test_abas_xlsx_com_estruturas_diferentes (test_indicadores.TestPlanilhasDiferentes.test_abas_xlsx_com_estruturas_diferentes) ... ok
+test_todas_as_operacoes_nos_tres_csv (test_indicadores.TestPlanilhasDiferentes.test_todas_as_operacoes_nos_tres_csv) ... ok
+
+----------------------------------------------------------------------
+Ran 60 tests in 9.082s
+
+OK

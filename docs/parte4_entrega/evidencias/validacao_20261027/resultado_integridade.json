@@ -1,0 +1,14 @@
+{
+  "alterados": [
+    "oneworld\\analises.py",
+    "oneworld\\metadados.py",
+    "tests\\test_bi.py",
+    "tests\\test_frontend_bi.py"
+  ],
+  "novos_fora_entrega": [],
+  "fora_lista_alterados": [],
+  "banco_real_preservado": true,
+  "sha256_banco_real": "383e32db1d5c4060dd7629142b579334e267eb2697da34084ba78a9a9416b679",
+  "copia_visual_corresponde_fontes_finais": true,
+  "sqlite_visual_sem_escrita_durante_consulta": true
+}

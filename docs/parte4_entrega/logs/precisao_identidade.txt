@@ -1,0 +1,2 @@
+JSON antigo distingue reais: False
+Hash novo distingue reais: True

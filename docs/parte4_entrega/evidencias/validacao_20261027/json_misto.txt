@@ -1,0 +1,63 @@
+2026-10-27 13:17:43.288 WARNING streamlit.runtime.scriptrunner_utils.script_run_context: Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-10-27 13:17:44.281 Serialization of dataframe to Arrow table was unsuccessful. Applying automatic fixes for column types to make the dataframe Arrow-compatible.
+Traceback (most recent call last):
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\streamlit\dataframe_util.py", line 957, in convert_pandas_df_to_arrow_table
+    return pa.Table.from_pandas(df, preserve_index=preserve_index)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "pyarrow/table.pxi", line 4777, in pyarrow.lib.Table.from_pandas
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\pyarrow\pandas_compat.py", line 658, in dataframe_to_arrays
+    arrays = [convert_column(c, f)
+              ~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\pyarrow\pandas_compat.py", line 643, in convert_column
+    raise e
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\pyarrow\pandas_compat.py", line 637, in convert_column
+    result = pa.array(col, type=type_, from_pandas=True, safe=safe)
+  File "pyarrow/array.pxi", line 414, in pyarrow.lib.array
+  File "pyarrow/array.pxi", line 97, in pyarrow.lib._ndarray_to_array
+    check_status(NdarrayToArrow(pool, values, mask, from_pandas,
+  File "pyarrow/error.pxi", line 92, in pyarrow.lib.check_status
+pyarrow.lib.ArrowTypeError: ("Expected bytes, got a 'bool' object", 'Conversion failed for column grupo with type object')
+2026-10-27 13:17:44.342 Serialization of dataframe to Arrow table was unsuccessful. Applying automatic fixes for column types to make the dataframe Arrow-compatible.
+Traceback (most recent call last):
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\streamlit\dataframe_util.py", line 957, in convert_pandas_df_to_arrow_table
+    return pa.Table.from_pandas(df, preserve_index=preserve_index)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "pyarrow/table.pxi", line 4777, in pyarrow.lib.Table.from_pandas
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\pyarrow\pandas_compat.py", line 658, in dataframe_to_arrays
+    arrays = [convert_column(c, f)
+              ~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\pyarrow\pandas_compat.py", line 643, in convert_column
+    raise e
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\pyarrow\pandas_compat.py", line 637, in convert_column
+    result = pa.array(col, type=type_, from_pandas=True, safe=safe)
+  File "pyarrow/array.pxi", line 414, in pyarrow.lib.array
+    result = _ndarray_to_array(values, mask, type, c_from_pandas, safe,
+  File "pyarrow/array.pxi", line 97, in pyarrow.lib._ndarray_to_array
+    check_status(NdarrayToArrow(pool, values, mask, from_pandas,
+  File "pyarrow/error.pxi", line 92, in pyarrow.lib.check_status
+pyarrow.lib.ArrowTypeError: ("Expected bytes, got a 'bool' object", 'Conversion failed for column grupo with type object')
+2026-10-27 13:17:44.345 Serialization of dataframe to Arrow table was unsuccessful. Applying automatic fixes for column types to make the dataframe Arrow-compatible.
+Traceback (most recent call last):
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\streamlit\dataframe_util.py", line 957, in convert_pandas_df_to_arrow_table
+    return pa.Table.from_pandas(df, preserve_index=preserve_index)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "pyarrow/table.pxi", line 4777, in pyarrow.lib.Table.from_pandas
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\pyarrow\pandas_compat.py", line 658, in dataframe_to_arrays
+    arrays = [convert_column(c, f)
+              ~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\pyarrow\pandas_compat.py", line 643, in convert_column
+    raise e
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\pyarrow\pandas_compat.py", line 637, in convert_column
+    result = pa.array(col, type=type_, from_pandas=True, safe=safe)
+  File "pyarrow/array.pxi", line 414, in pyarrow.lib.array
+    result = _ndarray_to_array(values, mask, type, c_from_pandas, safe,
+  File "pyarrow/array.pxi", line 97, in pyarrow.lib._ndarray_to_array
+    check_status(NdarrayToArrow(pool, values, mask, from_pandas,
+  File "pyarrow/error.pxi", line 92, in pyarrow.lib.check_status
+pyarrow.lib.ArrowTypeError: ("Expected bytes, got a 'bool' object", 'Conversion failed for column grupo with type object')
+exceptions []
+erros []
+grafico    grupo  valor
+0      A      1
+1  False      1
+2   True      1

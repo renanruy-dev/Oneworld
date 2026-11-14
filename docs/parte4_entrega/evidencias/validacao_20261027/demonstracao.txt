@@ -1,0 +1,142 @@
+{
+  "vendas": {
+    "kpis": {
+      "contagem": {
+        "titulo": "contagem",
+        "valor": 4,
+        "erro": null,
+        "mensagem": null
+      },
+      "distintos": {
+        "titulo": "distintos",
+        "valor": 3,
+        "erro": null,
+        "mensagem": null
+      },
+      "soma": {
+        "titulo": "soma",
+        "valor": 450,
+        "erro": null,
+        "mensagem": null
+      },
+      "media": {
+        "titulo": "media",
+        "valor": 112.5,
+        "erro": null,
+        "mensagem": null
+      },
+      "minimo": {
+        "titulo": "minimo",
+        "valor": 50,
+        "erro": null,
+        "mensagem": null
+      },
+      "maximo": {
+        "titulo": "maximo",
+        "valor": 200,
+        "erro": null,
+        "mensagem": null
+      }
+    },
+    "linhas_filtradas": 2,
+    "csv_sha256": "03fca5e1dae973afeb87ee0eda4cbee41e49a05df8f676f234414b6f2653b35a"
+  },
+  "educacao": {
+    "kpis": {
+      "contagem": {
+        "titulo": "contagem",
+        "valor": 3,
+        "erro": null,
+        "mensagem": null
+      },
+      "distintos": {
+        "titulo": "distintos",
+        "valor": 2,
+        "erro": null,
+        "mensagem": null
+      },
+      "soma": {
+        "titulo": "soma",
+        "valor": 24,
+        "erro": null,
+        "mensagem": null
+      },
+      "media": {
+        "titulo": "media",
+        "valor": 8.0,
+        "erro": null,
+        "mensagem": null
+      },
+      "minimo": {
+        "titulo": "minimo",
+        "valor": 6,
+        "erro": null,
+        "mensagem": null
+      },
+      "maximo": {
+        "titulo": "maximo",
+        "valor": 10,
+        "erro": null,
+        "mensagem": null
+      }
+    },
+    "linhas_filtradas": 2,
+    "csv_sha256": "2ee6e9fcd066277dd4427fce2404d623904c06d4aa8b36d3d138730c280ecf9f"
+  },
+  "estoque": {
+    "kpis": {
+      "contagem": {
+        "titulo": "contagem",
+        "valor": 3,
+        "erro": null,
+        "mensagem": null
+      },
+      "distintos": {
+        "titulo": "distintos",
+        "valor": 2,
+        "erro": null,
+        "mensagem": null
+      },
+      "soma": {
+        "titulo": "soma",
+        "valor": 47,
+        "erro": null,
+        "mensagem": null
+      },
+      "media": {
+        "titulo": "media",
+        "valor": 15.666666666666666,
+        "erro": null,
+        "mensagem": null
+      },
+      "minimo": {
+        "titulo": "minimo",
+        "valor": 5,
+        "erro": null,
+        "mensagem": null
+      },
+      "maximo": {
+        "titulo": "maximo",
+        "valor": 30,
+        "erro": null,
+        "mensagem": null
+      }
+    },
+    "linhas_filtradas": 2,
+    "csv_sha256": "74a96549be546022692545f40f8c9c60724eccd6d20fa11478169e486aa7ef15"
+  },
+  "linhas_vendas": [
+    100,
+    200,
+    100,
+    50
+  ],
+  "ambiente": {
+    "python": "3.14.7",
+    "pandas": "3.0.6",
+    "streamlit": "1.66.0",
+    "openpyxl": "3.1.5",
+    "sqlite": "3.50.4"
+  },
+  "isolado": "C:\\Users\\felip\\Documents\\Projetos\\One World\\docs\\parte4_entrega\\evidencias\\validacao_20261027\\demo__m55hy_i"
+}

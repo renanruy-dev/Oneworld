@@ -1,0 +1,12 @@
+test_conexao_bi_recusa_escrita (test_fontes_sqlite.TestFontesSQLite.test_conexao_bi_recusa_escrita) ... ok
+test_dashboard_blob_e_atualizacao_real_pequena (test_fontes_sqlite.TestFontesSQLite.test_dashboard_blob_e_atualizacao_real_pequena) ... 2026-10-27 12:29:17.563 WARNING streamlit.runtime.scriptrunner_utils.script_run_context: Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_dashboard_reflete_banco_filtros_e_retorno_a_exemplos (test_fontes_sqlite.TestFontesSQLite.test_dashboard_reflete_banco_filtros_e_retorno_a_exemplos) ... 2026-10-27 12:29:18.637 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_leitura_sem_alterar_banco_e_sem_criar_arquivo (test_fontes_sqlite.TestFontesSQLite.test_leitura_sem_alterar_banco_e_sem_criar_arquivo) ... ok
+test_nomes_de_tabela_sao_identificadores (test_fontes_sqlite.TestFontesSQLite.test_nomes_de_tabela_sao_identificadores) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 1.723s
+
+OK

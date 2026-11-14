@@ -1,0 +1,112 @@
+- log:
+  - generic: 5 options available.
+- log
+- link "Skip to main content":
+  - /url: "#stMain"
+- region "Sidebar":
+  - button "Fullscreen":
+  - paragraph: Gerência e análise em um só mundo
+  - paragraph: Navegação
+  - radiogroup "Navegação":
+    - radio "Dashboard" [checked]
+    - paragraph: Dashboard
+    - radio "Eventos"
+    - paragraph: Eventos
+    - radio "Convidados & Planilhas"
+    - paragraph: Convidados & Planilhas
+    - radio "Dados Externos"
+    - paragraph: Dados Externos
+    - radio "Orientação IA"
+    - paragraph: Orientação IA
+    - radio "Anotações"
+    - paragraph: Anotações
+    - radio "Configurações"
+    - paragraph: Configurações
+  - separator
+  - paragraph: Ambiente
+  - paragraph: "Modo: local"
+  - paragraph: "Banco: SQLite"
+  - paragraph: "Status: operacional"
+- banner:
+  - button "Expand sidebar":
+    - generic: keyboard_double_arrow_right
+  - button "Deploy":
+    - generic: Deploy
+  - button "Main menu":
+- main:
+  - generic: Dashboard
+  - generic: Análise configurável de conjuntos de dados
+  - paragraph: Escolha os dados e configure a análise. Arquivos e configurações da análise ficam nesta sessão local.
+  - paragraph: Adicionar conjuntos de dados (CSV, XLSX ou JSON)
+  - region "Adicionar conjuntos de dados (CSV, XLSX ou JSON)":
+    - button "file upload"
+    - button "Upload":
+      - generic: upload
+      - paragraph: Upload
+    - generic: 200MB per file • CSV, XLSX, JSON
+  - checkbox "Incluir tabelas do banco local" [checked]
+  - paragraph: Incluir tabelas do banco local
+  - paragraph: Conjunto de dados
+  - combobox "Conjunto de dados": "Banco local: demo_estoque"
+  - button "Open":
+  - paragraph: Tabela consultada somente para leitura. Alterações no banco aparecem ao atualizar a análise.
+  - generic "Tipos de colunas e datas":
+    - generic: keyboard_arrow_right
+    - paragraph: Tipos de colunas e datas
+  - generic "Filtros dinâmicos":
+    - generic: keyboard_arrow_right
+    - paragraph: Filtros dinâmicos
+  - paragraph: 3 de 3 registros após os filtros.
+  - heading "KPIs configuráveis" [level=3]:
+    - text: KPIs configuráveis
+    - link "Link to heading":
+      - /url: "#kpis-configuraveis"
+  - paragraph: Quantidade de KPIs
+  - spinbutton "Quantidade de KPIs": "1"
+  - button "Decrement" [disabled]:
+  - button "Increment":
+  - generic "Configurar KPI 1":
+    - generic: keyboard_arrow_right
+    - paragraph: Configurar KPI 1
+  - paragraph: KPI 1
+  - paragraph: "47"
+  - heading "Gráfico configurável" [level=3]:
+    - text: Gráfico configurável
+    - link "Link to heading":
+      - /url: "#grafico-configuravel"
+  - paragraph: Tipo de gráfico
+  - combobox "Tipo de gráfico": barras
+  - button "Open":
+  - paragraph: Agrupar por
+  - combobox "Agrupar por": produto
+  - button "Open":
+  - paragraph: Agregação
+  - combobox "Agregação": Soma
+  - button "Open":
+  - paragraph: Medida
+  - combobox "Medida": quantidade
+  - button "Open":
+  - button "Show data":
+  - button "Download as PNG":
+  - button "Copy Vega-Lite spec":
+  - button "Fullscreen":
+  - generic "Vega visualization":
+  - generic "Dados do gráfico" [active]:
+    - generic: keyboard_arrow_down
+    - paragraph: Dados do gráfico
+  - button "Show/hide columns":
+  - button "Download as CSV":
+  - button "Search":
+  - button "Fullscreen":
+  - heading "Registros filtrados" [level=3]:
+    - text: Registros filtrados
+    - link "Link to heading":
+      - /url: "#registros-filtrados"
+  - button "Show/hide columns":
+  - button "Download as CSV":
+  - button "Search":
+  - button "Fullscreen":
+  - button "Exportar dados filtrados":
+    - paragraph: Exportar dados filtrados
+  - separator
+  - paragraph: OneWorld — Protótipo 02 · dados em SQLite local · IA simulada nesta versão.

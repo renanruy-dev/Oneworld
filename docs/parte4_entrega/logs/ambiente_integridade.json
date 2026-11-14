@@ -1,0 +1,32 @@
+{
+  "data_local": "2026-10-27",
+  "python": "3.14.7 (tags/v3.14.7:823f032, Aug  5 2026, 10:51:32) [MSC v.1944 64 bit (AMD64)]",
+  "executavel": "C:\\Users\\felip\\Documents\\Projetos\\One World\\.venv\\Scripts\\python.exe",
+  "plataforma": "Windows-10-10.0.19045-SP0",
+  "sqlite": "3.50.4",
+  "pacotes": {
+    "pandas": "3.0.6",
+    "streamlit": "1.66.0",
+    "openpyxl": "3.1.5"
+  },
+  "sha256_protegidos": {
+    "app.py": "315ce67d45a0d717ac67a97343cc6a2a67e4bb4bb3944f86c48613abc1e46b2f",
+    "oneworld/backend.py": "68dd41251048e83f3e5a72aff1e16d25b06f29b2b1e9e34d7d8c56ba46923aff",
+    "oneworld/database.py": "46ab47b220178a204ad6d8d75d9ddb3d17a670632ee9d8544fc6e3ba83a06c8c",
+    "oneworld/config.py": "388eae7c6b2d22db9dc9cb39de51ee9ddfaf2bad3b48579356ebd8b3b8d5d7b7",
+    "oneworld/frontend.py": "72d31152bae42342cb69ccac1a269331f4dd631885a5f32f09ebb4e0b5b4125f",
+    "oneworld/tema.py": "9e2fdb186e463c3b698bf48fbd9c256466c156880a718387bb2278bcd17a50c2",
+    "requirements.txt": "fe5614cc23bd29ae840fd2cc4b63bad0d50842b402639b9a3a86f00044794221",
+    "oneworld.db": "383e32db1d5c4060dd7629142b579334e267eb2697da34084ba78a9a9416b679"
+  },
+  "protegidos_inalterados_apos_testes": {
+    "app.py": true,
+    "oneworld/backend.py": true,
+    "oneworld/database.py": true,
+    "oneworld/config.py": true,
+    "oneworld/frontend.py": true,
+    "oneworld/tema.py": true,
+    "requirements.txt": true,
+    "oneworld.db": true
+  }
+}

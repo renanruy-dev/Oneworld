@@ -1,0 +1,27 @@
+test_datas_histograma_e_multiplos_kpis (test_frontend_bi.TestDashboard.test_datas_histograma_e_multiplos_kpis) ... 2026-10-27 12:29:49.923 WARNING streamlit.runtime.scriptrunner_utils.script_run_context: Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_filtros_combinados_exportacao_e_limpeza_sem_ia (test_frontend_bi.TestDashboard.test_filtros_combinados_exportacao_e_limpeza_sem_ia) ... 2026-10-27 12:29:51.355 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_inicializacao_e_troca_dataset (test_frontend_bi.TestDashboard.test_inicializacao_e_troca_dataset) ... 2026-10-27 12:29:52.372 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_kpi_grafico_e_filtro_atualizados (test_frontend_bi.TestDashboard.test_kpi_grafico_e_filtro_atualizados) ... 2026-10-27 12:29:52.664 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_limites_invertidos_mostram_mensagem (test_frontend_bi.TestDashboard.test_limites_invertidos_mostram_mensagem) ... 2026-10-27 12:29:53.163 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_titulo_e_apresentacao_explicitos (test_frontend_bi.TestDashboard.test_titulo_e_apresentacao_explicitos) ... 2026-10-27 12:29:53.466 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_arquivos_invalidos (test_frontend_bi.TestUploads.test_arquivos_invalidos) ... 2026-10-27 12:29:53.881 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-10-27 12:29:54.069 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-10-27 12:29:54.268 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_arquivos_validos (test_frontend_bi.TestUploads.test_arquivos_validos) ... 2026-10-27 12:29:54.631 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-10-27 12:29:54.834 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-10-27 12:29:55.030 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_filtro_de_inteiros_grandes (test_frontend_bi.TestUploads.test_filtro_de_inteiros_grandes) ... 2026-10-27 12:29:55.242 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 5.567s
+
+OK

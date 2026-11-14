@@ -1,0 +1,4 @@
+CSV baixado pelo navegador: identico ao recorte esperado de educacao; 2 linhas, 3 colunas.
+aluno turma  nota
+  Ana     A     8
+Bruno     A     6

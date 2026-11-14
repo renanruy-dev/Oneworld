@@ -1,0 +1,139 @@
+- log
+- log
+- link "Skip to main content":
+  - /url: "#stMain"
+- region "Sidebar":
+  - button "Fullscreen":
+  - paragraph: Gerência e análise em um só mundo
+  - paragraph: Navegação
+  - radiogroup "Navegação":
+    - radio "Dashboard" [checked]
+    - paragraph: Dashboard
+    - radio "Eventos"
+    - paragraph: Eventos
+    - radio "Convidados & Planilhas"
+    - paragraph: Convidados & Planilhas
+    - radio "Dados Externos"
+    - paragraph: Dados Externos
+    - radio "Orientação IA"
+    - paragraph: Orientação IA
+    - radio "Anotações"
+    - paragraph: Anotações
+    - radio "Configurações"
+    - paragraph: Configurações
+  - separator
+  - paragraph: Ambiente
+  - paragraph: "Modo: local"
+  - paragraph: "Banco: SQLite"
+  - paragraph: "Status: operacional"
+- banner:
+  - button "Expand sidebar":
+    - generic: keyboard_double_arrow_right
+  - button "Deploy":
+    - generic: Deploy
+  - button "Main menu":
+- main:
+  - generic: Dashboard
+  - generic: Análise configurável de conjuntos de dados
+  - paragraph: Escolha os dados e configure a análise. Arquivos e configurações da análise ficam nesta sessão local.
+  - paragraph: Adicionar conjuntos de dados (CSV, XLSX ou JSON)
+  - region "Adicionar conjuntos de dados (CSV, XLSX ou JSON)":
+    - button "file upload"
+    - button "Upload":
+      - generic: upload
+      - paragraph: Upload
+    - generic: 200MB per file • CSV, XLSX, JSON
+  - checkbox "Incluir tabelas do banco local"
+  - paragraph: Incluir tabelas do banco local
+  - paragraph: Conjunto de dados
+  - combobox "Conjunto de dados": "Exemplo: educacao"
+  - button "Open":
+  - generic "Tipos de colunas e datas":
+    - generic: keyboard_arrow_right
+    - paragraph: Tipos de colunas e datas
+  - generic "Filtros dinâmicos":
+    - generic: keyboard_arrow_down
+    - paragraph: Filtros dinâmicos
+  - button "Limpar filtros":
+    - paragraph: Limpar filtros
+  - checkbox "Filtrar aluno"
+  - paragraph: Filtrar aluno
+  - checkbox "Filtrar turma" [checked]
+  - paragraph: Filtrar turma
+  - checkbox "Incluir nulos / valores não finitos"
+  - paragraph: Incluir nulos / valores não finitos
+  - paragraph: Valores de turma
+  - generic: A
+  - button:
+  - group "Selected values":
+    - generic "A":
+      - generic "A"
+      - button "Remove A":
+  - combobox "Valores de turma" [active]
+  - button "Clear all":
+  - button "Open":
+  - checkbox "Filtrar nota"
+  - paragraph: Filtrar nota
+  - paragraph: 2 de 3 registros após os filtros.
+  - heading "KPIs configuráveis" [level=3]:
+    - text: KPIs configuráveis
+    - link "Link to heading":
+      - /url: "#kpis-configuraveis"
+  - paragraph: Quantidade de KPIs
+  - spinbutton "Quantidade de KPIs": "1"
+  - button "Decrement" [disabled]:
+  - button "Increment":
+  - generic "Configurar KPI 1":
+    - generic: keyboard_arrow_down
+    - paragraph: Configurar KPI 1
+  - paragraph: Operação
+  - combobox "Operação": Média
+  - button "Open":
+  - paragraph: Coluna do KPI
+  - combobox "Coluna do KPI": nota
+  - button "Open":
+  - paragraph: Título do KPI
+  - textbox "Título do KPI":
+    - /placeholder: ""
+    - text: KPI 1
+  - paragraph: Apresentação
+  - combobox "Apresentação": Número
+  - button "Open":
+  - paragraph: KPI 1
+  - paragraph: "7.00"
+  - heading "Gráfico configurável" [level=3]:
+    - text: Gráfico configurável
+    - link "Link to heading":
+      - /url: "#grafico-configuravel"
+  - paragraph: Tipo de gráfico
+  - combobox "Tipo de gráfico": barras
+  - button "Open":
+  - paragraph: Agrupar por
+  - combobox "Agrupar por": turma
+  - button "Open":
+  - paragraph: Agregação
+  - combobox "Agregação": Média
+  - button "Open":
+  - paragraph: Medida
+  - combobox "Medida": nota
+  - button "Open":
+  - button "Show data":
+  - button "Download as PNG":
+  - button "Copy Vega-Lite spec":
+  - button "Fullscreen":
+  - generic "Vega visualization":
+  - generic "Dados do gráfico":
+    - generic: keyboard_arrow_right
+    - paragraph: Dados do gráfico
+  - heading "Registros filtrados" [level=3]:
+    - text: Registros filtrados
+    - link "Link to heading":
+      - /url: "#registros-filtrados"
+  - button "Show/hide columns":
+  - button "Download as CSV":
+  - button "Search":
+  - button "Fullscreen":
+  - button "Exportar dados filtrados":
+    - paragraph: Exportar dados filtrados
+  - separator
+  - paragraph: OneWorld — Protótipo 02 · dados em SQLite local · IA simulada nesta versão.

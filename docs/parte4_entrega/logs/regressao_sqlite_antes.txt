@@ -1,0 +1,56 @@
+test_conexao_bi_recusa_escrita (test_fontes_sqlite.TestFontesSQLite.test_conexao_bi_recusa_escrita) ... ok
+test_dashboard_blob_e_atualizacao_real_pequena (test_fontes_sqlite.TestFontesSQLite.test_dashboard_blob_e_atualizacao_real_pequena) ... 2026-10-27 12:29:00.472 WARNING streamlit.runtime.scriptrunner_utils.script_run_context: Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-10-27 12:29:01.427 Uncaught app execution
+Traceback (most recent call last):
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 136, in exec_func_with_error_handling
+    result = func()
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 924, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\felip\AppData\Local\Temp\tmpy0mmxcri\d9fa8ed2d9e10f58318e42bc3d97aef6", line 3, in <module>
+    mostrar_dashboard("#5B4FC4")
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "C:\Users\felip\Documents\Projetos\One World\oneworld\frontend_bi.py", line 223, in mostrar_dashboard
+    df = _selecionar_dados()
+  File "C:\Users\felip\Documents\Projetos\One World\oneworld\frontend_bi.py", line 54, in _selecionar_dados
+    conteudo = dados_banco.to_json(orient="split", date_format="iso").encode()
+               ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\pandas\core\generic.py", line 2623, in to_json
+    return json.to_json(
+           ~~~~~~~~~~~~^
+        path_or_buf=path_or_buf,
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<12 lines>...
+        mode=mode,
+        ^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\pandas\io\json\_json.py", line 241, in to_json
+    ).write()
+      ~~~~~^^
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\pandas\io\json\_json.py", line 292, in write
+    return ujson_dumps(
+        self.obj_to_write,
+    ...<6 lines>...
+        indent=self.indent,
+    )
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xff in position 55: invalid start byte
+FAIL
+test_dashboard_reflete_banco_filtros_e_retorno_a_exemplos (test_fontes_sqlite.TestFontesSQLite.test_dashboard_reflete_banco_filtros_e_retorno_a_exemplos) ... 2026-10-27 12:29:01.447 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+ok
+test_leitura_sem_alterar_banco_e_sem_criar_arquivo (test_fontes_sqlite.TestFontesSQLite.test_leitura_sem_alterar_banco_e_sem_criar_arquivo) ... ok
+test_nomes_de_tabela_sao_identificadores (test_fontes_sqlite.TestFontesSQLite.test_nomes_de_tabela_sao_identificadores) ... ok
+
+======================================================================
+FAIL: test_dashboard_blob_e_atualizacao_real_pequena (test_fontes_sqlite.TestFontesSQLite.test_dashboard_blob_e_atualizacao_real_pequena)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\felip\Documents\Projetos\One World\tests\test_fontes_sqlite.py", line 75, in test_dashboard_blob_e_atualizacao_real_pequena
+    self.assertFalse(app.exception)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+AssertionError: ElementList(_list=[Exception(message="'utf-8' codec can't decode byte 0xff in position 55: invalid start byte", stack_trace=['File "C:\\Users\\felip\\AppData\\Local\\Temp\\tmpy0mmxcri\\d9fa8ed2d9e10f58318e42bc3d97aef6", line 3, in <module>\n    mostrar_dashboard("#5B4FC4")\n    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^', 'File "C:\\Users\\felip\\Documents\\Projetos\\One World\\oneworld\\frontend_bi.py", line 223, in mostrar_dashboard\n    df = _selecionar_dados()', 'File "C:\\Users\\felip\\Documents\\Projetos\\One World\\oneworld\\frontend_bi.py", line 54, in _selecionar_dados\n    conteudo = dados_banco.to_json(orient="split", date_format="iso").encode()\n               ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^', 'File "C:\\Users\\felip\\Documents\\Projetos\\One World\\.venv\\Lib\\site-packages\\pandas\\core\\generic.py", line 2623, in to_json\n    return json.to_json(\n           ~~~~~~~~~~~~^\n        path_or_buf=path_or_buf,\n        ^^^^^^^^^^^^^^^^^^^^^^^^\n    ...<12 lines>...\n        mode=mode,\n        ^^^^^^^^^^\n    )\n    ^', 'File "C:\\Users\\felip\\Documents\\Projetos\\One World\\.venv\\Lib\\site-packages\\pandas\\io\\json\\_json.py", line 241, in to_json\n    ).write()\n      ~~~~~^^', 'File "C:\\Users\\felip\\Documents\\Projetos\\One World\\.venv\\Lib\\site-packages\\pandas\\io\\json\\_json.py", line 292, in write\n    return ujson_dumps(\n        self.obj_to_write,\n    ...<6 lines>...\n        indent=self.indent,\n    )'])]) is not false
+
+----------------------------------------------------------------------
+Ran 5 tests in 1.641s
+
+FAILED (failures=1)

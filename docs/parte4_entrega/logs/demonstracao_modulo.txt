@@ -1,0 +1,4 @@
+ dataset coluna num�rica coluna distinta  contagem  distintos  soma      media  minimo  maximo
+  vendas           valor         produto         4          3   450 112.500000      50     200
+educacao            nota           turma         3          2    24   8.000000       6      10
+ estoque      quantidade       categoria         3          2    47  15.666667       5      30

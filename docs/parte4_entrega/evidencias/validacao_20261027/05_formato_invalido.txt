@@ -1,0 +1,76 @@
+- log
+- log
+- link "Skip to main content":
+  - /url: "#stMain"
+- region "Sidebar":
+  - button "Fullscreen":
+  - paragraph: Gerência e análise em um só mundo
+  - paragraph: Navegação
+  - radiogroup "Navegação":
+    - radio "Dashboard" [checked]
+    - paragraph: Dashboard
+    - radio "Eventos"
+    - paragraph: Eventos
+    - radio "Convidados & Planilhas"
+    - paragraph: Convidados & Planilhas
+    - radio "Dados Externos"
+    - paragraph: Dados Externos
+    - radio "Orientação IA"
+    - paragraph: Orientação IA
+    - radio "Anotações"
+    - paragraph: Anotações
+    - radio "Configurações"
+    - paragraph: Configurações
+  - separator
+  - paragraph: Ambiente
+  - paragraph: "Modo: local"
+  - paragraph: "Banco: SQLite"
+  - paragraph: "Status: operacional"
+- banner:
+  - button "Expand sidebar":
+    - generic: keyboard_double_arrow_right
+  - button "Deploy":
+    - generic: Deploy
+  - button "Main menu":
+- main:
+  - generic: Dashboard
+  - generic: Análise configurável de conjuntos de dados
+  - paragraph: Escolha os dados e configure a análise. Arquivos e configurações da análise ficam nesta sessão local.
+  - paragraph: Adicionar conjuntos de dados (CSV, XLSX ou JSON)
+  - region "Adicionar conjuntos de dados (CSV, XLSX ou JSON)":
+    - button "file upload"
+    - button "Upload":
+      - generic: upload
+      - paragraph: Upload
+    - generic: 200MB per file • CSV, XLSX, JSON
+  - checkbox "Incluir tabelas do banco local"
+  - paragraph: Incluir tabelas do banco local
+  - paragraph: Conjunto de dados
+  - combobox "Conjunto de dados": "Exemplo: vendas"
+  - button "Open":
+  - generic "Tipos de colunas e datas":
+    - generic: keyboard_arrow_down
+    - paragraph: Tipos de colunas e datas
+  - button "Show/hide columns":
+  - button "Download as CSV":
+  - button "Search":
+  - button "Fullscreen":
+  - paragraph: Interpretar colunas como data
+  - generic: data
+  - button:
+  - group "Selected values":
+    - generic "data":
+      - generic "data"
+      - button "Remove data":
+  - combobox "Interpretar colunas como data"
+  - button "Clear all":
+  - button "Open":
+  - paragraph: Formato das datas
+  - button "Help for Formato das datas":
+  - textbox "Formato das datas" [active]:
+    - /placeholder: ""
+    - text: "%Q"
+  - alert:
+    - paragraph: "Não foi possível interpretar as datas; confira o formato: 'Q' is a bad directive in format '%Q'"
+  - separator
+  - paragraph: OneWorld — Protótipo 02 · dados em SQLite local · IA simulada nesta versão.

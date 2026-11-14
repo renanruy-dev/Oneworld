@@ -1,0 +1,23 @@
+{
+  "oneworld\\analises.py": "839807b6908512e0e150b0b20b67f2e0f425eab54ce54b9133343cd910ddca56",
+  "oneworld\\backend.py": "68dd41251048e83f3e5a72aff1e16d25b06f29b2b1e9e34d7d8c56ba46923aff",
+  "oneworld\\config.py": "388eae7c6b2d22db9dc9cb39de51ee9ddfaf2bad3b48579356ebd8b3b8d5d7b7",
+  "oneworld\\database.py": "46ab47b220178a204ad6d8d75d9ddb3d17a670632ee9d8544fc6e3ba83a06c8c",
+  "oneworld\\filtros.py": "bc3b059fbee226e8ab8ae12445d6f5b850de010e8afe79dd5519e7527a9dbb87",
+  "oneworld\\fontes_sqlite.py": "90fe25dffd041c7c617d100457be187fe2b59a16be6c1456c397a083f4f362af",
+  "oneworld\\formatacao.py": "0bde7558f83695ca9da5f66ae699b3d7bc61f16bbb8336b98987110ea05bf8cc",
+  "oneworld\\frontend.py": "72d31152bae42342cb69ccac1a269331f4dd631885a5f32f09ebb4e0b5b4125f",
+  "oneworld\\frontend_bi.py": "4435bd8f1a5ed8d10318e5fcb40ba883118ec94717ec6056024867e059172d67",
+  "oneworld\\indicadores.py": "cbeadaba8028c72f07f83d373bce998ff449cbc337953277d90f086ffd512f59",
+  "oneworld\\metadados.py": "01dac58bce6f88b114596a469090ffd870d556283feced3b012c364329281fb1",
+  "oneworld\\tema.py": "9e2fdb186e463c3b698bf48fbd9c256466c156880a718387bb2278bcd17a50c2",
+  "oneworld\\__init__.py": "c44159eafe17eceaa298b47f18d758781fcdac0c9eb90e80b1349899d19de8c4",
+  "exemplos\\demonstrar_indicadores.py": "bc64dc198215386b566ee1f1afd22fc98e2bc97bddde945a4ca29695fb0047fb",
+  "tests\\test_bi.py": "a13043f49636a3e049cf206c60d2de3b66b4b1a1f351088fa02fdeda3f27cde2",
+  "tests\\test_fontes_sqlite.py": "53fbab1bc0e7cd11a31184503449af07ca7ea8301d85bdd4f6e30509cfb10378",
+  "tests\\test_frontend_bi.py": "7877a5c0e4978de95dc1fce35ba11deeee3cd1e004eba5eb1633c82a25bee298",
+  "tests\\test_indicadores.py": "5fdf97157e28f4f4c723e2416d23bc45afdcdae4d7990329b4445e9d92dadfe4",
+  "app.py": "315ce67d45a0d717ac67a97343cc6a2a67e4bb4bb3944f86c48613abc1e46b2f",
+  "requirements.txt": "fe5614cc23bd29ae840fd2cc4b63bad0d50842b402639b9a3a86f00044794221",
+  "oneworld.db": "383e32db1d5c4060dd7629142b579334e267eb2697da34084ba78a9a9416b679"
+}

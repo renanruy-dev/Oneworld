@@ -1,0 +1,59 @@
+{
+  "data": "27/10/2026",
+  "etapa": "Prompt 2 - preparacao documental",
+  "nova_execucao_aplicativo_ou_suite": false,
+  "integridade": {
+    "metodo": "SHA-256 antes/depois dos arquivos do projeto; excluidos .git, .venv e __pycache__. Sem importacao do aplicativo ou abertura de SQLite.",
+    "arquivos_inventariados_antes": 188,
+    "alterados": [
+      "docs/parte4_entrega/avaliacao_reacao.md",
+      "docs/parte4_entrega/checklist.md",
+      "docs/parte4_entrega/contribuicao_entrega4.md",
+      "docs/parte4_entrega/dependencias_equipe.md",
+      "docs/parte4_entrega/encerramento_parte4.md",
+      "docs/parte4_entrega/manual_dashboard.md",
+      "docs/parte4_entrega/relatorio_equipe.md",
+      "docs/parte4_entrega/relato_individual_base.md",
+      "docs/parte4_entrega/roteiro_capacitacao.md",
+      "docs/parte4_entrega/roteiro_validacao_parceiro.md"
+    ],
+    "novos": [
+      "docs/parte4_entrega/roteiro_apresentacao.md"
+    ],
+    "fora_pasta_autorizada": [],
+    "banco_real_preservado": true,
+    "sha256_banco_real": "383e32db1d5c4060dd7629142b579334e267eb2697da34084ba78a9a9416b679"
+  },
+  "manifesto_existente": {
+    "fontes_conferidas": 19,
+    "artefatos_conferidos": 61,
+    "divergencias_fontes": [],
+    "divergencias_artefatos": []
+  },
+  "gabaritos_csv": {
+    "metodo": "Biblioteca padrao Python: csv, datetime e statistics. Conferencia aritmetica independente; nao executa a interface.",
+    "vendas_6_kpis": true,
+    "papelaria_barras_250": true,
+    "linhas_100_200_100_50": true,
+    "datas_inclusivas_300_media150": true,
+    "educacao_media8_turmaA_media7": true,
+    "filtros_combinados_ana_e_vazio": true,
+    "estoque_soma47_3_observacoes": true,
+    "csv_download_igual_turmaA": true
+  },
+  "revisao_documental": {
+    "oito_materiais_presentes": true,
+    "prazos_previstos_com_confirmacao_pendente": true,
+    "links_locais_conferidos": 242,
+    "links_ausentes": [],
+    "log_anterior_60_testes_OK_conferido": true,
+    "instrumentos_sem_respostas_e_aceite_sem_marcacao": "Revisao textual; campos preservados em branco.",
+    "autoria_e_experiencias_pessoais": "Campos explicitos para resposta pelo integrante, sem depoimento inventado.",
+    "distincao_tecnico_parceiro": "Mantida nos oito materiais e checklist."
+  },
+  "limites": [
+    "Conferencia documental nao e nova execucao funcional nem validacao do parceiro.",
+    "Nenhum contato, publicacao ou envio realizado.",
+    "Campos pessoais, revisao coletiva e confirmacao da disciplina permanecem pendentes."
+  ]
+}

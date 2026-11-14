@@ -1,0 +1,1 @@
+Compilacao em memoria de oneworld/*.py, tests/*.py, app.py e preparar_demo.py: OK; sem gravar caches.

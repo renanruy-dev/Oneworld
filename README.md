@@ -113,3 +113,7 @@ As bibliotecas utilizadas estão listadas no arquivo `requirements.txt`:
 ## 📄 Licença
 
 Este projeto é desenvolvido para fins operacionais e de demonstração. Consulte o autor para detalhes sobre distribuição e uso comercial.
+
+## Dashboard de BI e materiais de entrega
+
+Consulte o [guia da Parte 4](docs/parte4_entrega/leia_primeiro.md) para executar a demonstração com dados sintéticos, acessar manual e roteiros. O [status da entrega](docs/parte4_entrega/status_entrega.md) reúne a verificação atual e as pendências pessoais e coletivas.

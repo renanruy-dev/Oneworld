@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "C:\Users\felip\Documents\Projetos\One World\exemplos\demonstrar_indicadores.py", line 6, in <module>
+    from oneworld.indicadores import OPERACOES, calcular_kpi
+ModuleNotFoundError: No module named 'oneworld'

@@ -1,0 +1,104 @@
+{
+  "data_local": "2026-10-27T13:37:46.083412-03:00",
+  "etapa": "Prompt 3 - conferencia final",
+  "estado": "Parte 4 pronta para revisao e demonstracao local no ambiente existente; projeto coletivo e conclusao academica dependem de pessoas e equipe.",
+  "nova_execucao_suite": false,
+  "nova_execucao_aplicativo": false,
+  "correcoes_tecnicas": [],
+  "justificativa_sem_repetir_suite": "Fontes/testes e artefatos identicos ao manifesto da rodada de 60 testes; ambiente principal mantido. Sem necessidade de nova validacao integral.",
+  "manifesto": {
+    "fontes_finais": {
+      "conferidos": 19,
+      "divergencias": []
+    },
+    "artefatos": {
+      "conferidos": 61,
+      "divergencias": []
+    }
+  },
+  "demo": {
+    "arquivos_codigo_apoio_conferidos": 20,
+    "divergencias": [],
+    "banco_sintetico": "Hash conferido via manifesto; nao aberto."
+  },
+  "ambiente": {
+    "python": "3.14.7",
+    "pandas": "3.0.6",
+    "streamlit": "1.66.0",
+    "openpyxl": "3.1.5",
+    "numpy": "2.5.4",
+    "pyarrow": "26.0.0"
+  },
+  "evidencia_anterior": {
+    "log": "evidencias/validacao_20261027/testes_finais.txt",
+    "log_60_OK_conferido": true,
+    "contagem_estatica_atual": {
+      "test_bi.py": 27,
+      "test_fontes_sqlite.py": 5,
+      "test_frontend_bi.py": 12,
+      "test_indicadores.py": 16
+    },
+    "alcance": "Evidencia funcional anterior preservada; nao e nova execucao."
+  },
+  "gabaritos": {
+    "metodo": "csv/statistics da biblioteca padrao; conferencia aritmetica independente sem executar funcoes BI ou interface.",
+    "assertivas": {
+      "vendas_seis_kpis": true,
+      "educacao_seis_kpis": true,
+      "estoque_seis_kpis": true,
+      "barras_vendas": true,
+      "papelaria": true,
+      "linhas_vendas": true,
+      "datas_inclusivas": true,
+      "turma_A": true,
+      "filtro_ana": true,
+      "filtro_vazio": true,
+      "download": true
+    }
+  },
+  "documentos": {
+    "arquivos_md_principais": 13,
+    "links_locais": 279,
+    "ausentes": [],
+    "ancoras_nao_localizadas": [],
+    "autorreferencia": "Log verificado apos gravacao."
+  },
+  "manual": "Confrontado com frontend_bi.py: fontes, tipos/datas, filtros/limpeza, 1 a 6 KPIs, formatos, barras/linhas/histograma, dados do grafico, tabela/CSV, mensagens e limites. Instrumentos pessoais e externos continuam em branco.",
+  "roteiro": "Caminhos, arquivos e config.DB_PATH inspecionados; hashes identicos a copia visual existente. Bloco PowerShell analisado com System.Management.Automation.Language.Parser, sem erros; nao executado. Orientado uso futuro de copia temporaria; gerador antigo nao executado pois sobrescreve resultados historicos.",
+  "integridade": {
+    "metodo": "SHA-256 antes/depois; excluidos .git, .venv, __pycache__. Banco lido apenas como bytes, sem conexao SQLite/importacao do app.",
+    "inventario_anterior": "conferencia_final_antes.json",
+    "arquivos_antes": 190,
+    "alterados": [
+      "docs/parte4_entrega/checklist.md",
+      "docs/parte4_entrega/roteiro_apresentacao.md",
+      "docs/parte4_entrega/validacao_tecnica.md"
+    ],
+    "novos": [
+      "docs/parte4_entrega/leia_primeiro.md",
+      "docs/parte4_entrega/logs/conferencia_final_antes.json",
+      "docs/parte4_entrega/logs/conferencia_final.json"
+    ],
+    "removidos": [],
+    "fora_pasta_autorizada": [],
+    "banco_real_preservado": true,
+    "sha256_banco_real": "383e32db1d5c4060dd7629142b579334e267eb2697da34084ba78a9a9416b679",
+    "hashes_alterados": {
+      "docs/parte4_entrega/checklist.md": {
+        "antes": "4f53120da3fa4d06a88f4d4e451f89d576901d49b5a1c095a366852848692dce",
+        "depois": "18fe4a0c293d3185fcb81b36e9d941753a99c8faea4c7f7a4d68302d69967c1e"
+      },
+      "docs/parte4_entrega/roteiro_apresentacao.md": {
+        "antes": "107b20c7a57da931b06c64724b5b8c0dd33a9b22ac607bdc3071c121cfac7a5f",
+        "depois": "5e52ea2f6c93ea42b3fb64b556299ee3bf986b02b1f82a337b1fcb1a826eff12"
+      },
+      "docs/parte4_entrega/validacao_tecnica.md": {
+        "antes": "096cfc5d0047c70d7368bfdc9908fcfe2b6f4f65239693a99f92cde535ec886c",
+        "depois": "c43967af79e8e9157e8cb34110188f76d6ec7b304087f3f518a3b6a94c70e2d0"
+      }
+    },
+    "codigo_testes_configuracao_dependencias_evidencias_e_documentos_originais_preservados": true
+  },
+  "pendencias": "Grupos B/C do checklist: relato/revisao pessoal, decisoes e aprovacao da equipe, parceiro, capacitacao/reacao, apresentacao e submissao. Nenhuma pendencia tecnica local identificada no escopo. Novos defeitos em uso futuro exigem novo registro.",
+  "acoes_externas_realizadas": []
+}

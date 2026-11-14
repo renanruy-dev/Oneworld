@@ -1,0 +1,51 @@
+2026-10-27 13:11:34.907 WARNING streamlit.runtime.scriptrunner_utils.script_run_context: Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
+2026-10-27 13:11:36.146 Uncaught app execution
+Traceback (most recent call last):
+  File "pandas/_libs/tslibs/strptime.pyx", line 230, in pandas._libs.tslibs.strptime._get_format_regex
+  File "C:\Users\felip\AppData\Local\Python\pythoncore-3.14-64\Lib\_strptime.py", line 486, in compile
+    return re_compile(self.pattern(format), IGNORECASE)
+                      ~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\felip\AppData\Local\Python\pythoncore-3.14-64\Lib\_strptime.py", line 471, in pattern
+    format = re_sub(r'%[-_0^#]*[0-9]*([OE]?\\?.?)', repl, format)
+  File "C:\Users\felip\AppData\Local\Python\pythoncore-3.14-64\Lib\re\__init__.py", line 208, in sub
+    return _compile(pattern, flags).sub(repl, string, count)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\felip\AppData\Local\Python\pythoncore-3.14-64\Lib\_strptime.py", line 470, in repl
+    return self[format_char]
+           ~~~~^^^^^^^^^^^^^
+  File "pandas/_libs/tslibs/strptime.pyx", line 873, in pandas._libs.tslibs.strptime.TimeRE.__getitem__
+KeyError: 'Q'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 136, in exec_func_with_error_handling
+    result = func()
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 924, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\felip\AppData\Local\Temp\tmpyzpuww30\705f74ee03875454eb0f4a8bfb062c50", line 2, in <module>
+    mostrar_dashboard("#5B4FC4")
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+  File "C:\Users\felip\Documents\Projetos\One World\oneworld\frontend_bi.py", line 239, in mostrar_dashboard
+    df = _tipar_datas(df)
+  File "C:\Users\felip\Documents\Projetos\One World\oneworld\frontend_bi.py", line 99, in _tipar_datas
+    df, falhas = configurar_datas(df, colunas, formato)
+                 ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\felip\Documents\Projetos\One World\oneworld\metadados.py", line 76, in configurar_datas
+    datas = pd.to_datetime(s, format=formato, errors="coerce")
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\pandas\core\tools\datetimes.py", line 1040, in to_datetime
+    values = convert_listlike(arg._values, format)
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\pandas\core\tools\datetimes.py", line 435, in _convert_listlike_datetimes
+    return _array_strptime_with_fallback(arg, name, utc, format, exact, errors)
+  File "C:\Users\felip\Documents\Projetos\One World\.venv\Lib\site-packages\pandas\core\tools\datetimes.py", line 470, in _array_strptime_with_fallback
+    result, tz_out = array_strptime(arg, fmt, exact=exact, errors=errors, utc=utc)
+                     ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "pandas/_libs/tslibs/strptime.pyx", line 391, in pandas._libs.tslibs.strptime.array_strptime
+  File "pandas/_libs/tslibs/strptime.pyx", line 220, in pandas._libs.tslibs.strptime._get_format_regex
+  File "pandas/_libs/tslibs/strptime.pyx", line 238, in pandas._libs.tslibs.strptime._get_format_regex
+ValueError: 'Q' is a bad directive in format '%Q'
+mixed categories TypeError '<' not supported between instances of 'str' and 'bool'
+invalid date format ValueError 'Q' is a bad directive in format '%Q'
+remove date typing [] [] [('Conjunto de dados', 'Exemplo: vendas'), ('Opera��o', 'contagem'), ('Apresenta��o', 'N�mero'), ('Tipo de gr�fico', 'barras'), ('Agrupar por', 'produto'), ('Agrega��o', 'contagem')]
+invalid format UI ["'Q' is a bad directive in format '%Q'"] []

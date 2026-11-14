@@ -1,0 +1,146 @@
+Browser tab: 1, Title: "OneWorld", URL: "http://127.0.0.1:18653/".
+1 AXWebArea OneWorld, URL: 127.0.0.1:18653/
+	2 container
+		3 text 1 option available.
+		4 container
+			5 link Description: Skip to main content, Value: 127.0.0.1:18653/#stMain
+			6 container Description: Sidebar, ID: stSidebar
+				7 container
+					8 container
+						9 button Fullscreen
+						10 image
+					11 text Gerência e análise em um só mundo
+					12 Description: Navegação, ID: react-aria6062310514-:r4:
+						13 container
+							14 radio button (settable, integer) Description: Dashboard, Value: 1
+							15 text Dashboard
+						16 container
+							17 radio button (settable, integer) Description: Eventos, Value: 0
+							18 text Eventos
+						19 container
+							20 radio button (settable, integer) Description: Convidados & Planilhas, Value: 0
+							21 text Convidados & Planilhas
+						22 container
+							23 radio button (settable, integer) Description: Dados Externos, Value: 0
+							24 text Dados Externos
+						25 container
+							26 radio button (settable, integer) Description: Orientação IA, Value: 0
+							27 text Orientação IA
+						28 container
+							29 radio button (settable, integer) Description: Anotações, Value: 0
+							30 text Anotações
+						31 container
+							32 radio button (settable, integer) Description: Configurações, Value: 0
+							33 text Configurações
+					34 text Ambiente
+					35 text Modo: local
+					36 text Banco: SQLite
+					37 text Status: operacional
+			38 container
+				39 button (collapsed) Description: Expand sidebar, Secondary Actions: Expand
+				40 button Deploy
+				41 pop up button (collapsed) Description: Main menu, Secondary Actions: Expand
+			42 container stMain
+				43 container
+					44 text Dashboard Análise configurável de conjuntos de dados
+				45 text Escolha os dados e configure a análise. Arquivos e configurações da análise ficam nesta sessão local.
+				46 container
+					47 container Adicionar conjuntos de dados (CSV, XLSX ou JSON)
+						48 button file upload
+						49 button Upload
+							50 text Upload
+						51 text 200MB per file
+						52 text  • CSV, XLSX, JSON
+				53 container
+					54 checkbox (settable, integer) Description: Incluir tabelas do banco local, Value: 1
+					55 text Incluir tabelas do banco local
+				56 container
+					57 combo box (collapsed, settable) Description: Conjunto de dados, Value: Exemplo: estoque, ID: react-aria6062310514-:rq:, Secondary Actions: Expand
+					58 pop up button (collapsed) Description: Open, ID: react-aria6062310514-:rm:, Secondary Actions: Expand
+				59 button (collapsed) Tipos de colunas e datas, Secondary Actions: Expand
+					60 text Tipos de colunas e datas
+				61 button (collapsed) Filtros dinâmicos, Secondary Actions: Expand
+					62 text Filtros dinâmicos
+				63 text 3 de 3 registros após os filtros.
+				64 heading KPIs configuráveis, Value: 3, ID: kpis-configuraveis
+					65 text KPIs configuráveis
+					66 link Description: Link to heading, Value: 127.0.0.1:18653/#kpis-configuraveis
+				67 container
+					68 stepper (settable, integer) Description: Quantidade de KPIs, Value: 1, ID: :rea:
+					69 button (disabled) Decrement
+					70 button Increment
+				71 button (collapsed) Configurar KPI 1, Secondary Actions: Expand
+					72 text Configurar KPI 1
+				73 container
+					74 text KPI 1
+					75 text 3
+				76 heading Gráfico configurável, Value: 3, ID: grafico-configuravel
+					77 text Gráfico configurável
+					78 link Description: Link to heading, Value: 127.0.0.1:18653/#grafico-configuravel
+				79 container
+					80 combo box (collapsed, settable) Description: Tipo de gráfico, Value: histograma, ID: react-aria6062310514-:rfp:, Secondary Actions: Expand
+					81 pop up button (collapsed) Description: Open, ID: react-aria6062310514-:rfl:, Secondary Actions: Expand
+				82 container
+					83 combo box (collapsed, settable) Description: Coluna numérica, Value: quantidade, ID: react-aria6062310514-:ria:, Secondary Actions: Expand
+					84 pop up button (collapsed) Description: Open, ID: react-aria6062310514-:ri6:, Secondary Actions: Expand
+				85 container
+					86 stepper (settable, integer) Description: Intervalos, Value: 10, ID: :rij:
+					87 button Decrement
+					88 button Increment
+				89 container
+					90 button Show data
+					91 button Download as PNG
+					92 button Copy Vega-Lite spec
+					93 button Fullscreen
+					94 container Vega visualization
+						95 image
+							96 container X-axis titled 'intervalo' for a discrete scale with 10 values: (4.973999999999999, 7.5], (7.5, 10.0], (10.0, 12.5], (12.5, 15.0], (15.0, 17.5], ending with (27.5, 30.0] Y-axis titled 'frequencia' for a linear scale with values from 0.0 to 1.0 intervalo: (4.973999999999999, 7.5]; frequencia: 1 intervalo: (7.5, 10.0]; frequencia: 0 intervalo: (10.0, 12.5]; frequencia: 1 intervalo: (12.5, 15.0]; frequencia: 0 intervalo: (15.0, 17.5]; frequencia: 0 intervalo: (17.5, 20.0]; frequencia: 0 intervalo: (20.0, 22.5]; frequencia: 0 intervalo: (22.5, 25.0]; frequencia: 0 intervalo: (25.0, 27.5]; frequencia: 0 intervalo: (27.5, 30.0]; frequencia: 1
+								97 axis X-axis titled 'intervalo' for a discrete scale with 10 values: (4.973999999999999, 7.5], (7.5, 10.0], (10.0, 12.5], (12.5, 15.0], (15.0, 17.5], ending with (27.5, 30.0]
+								98 axis Y-axis titled 'frequencia' for a linear scale with values from 0.0 to 1.0
+								99 container intervalo: (4.973999999999999, 7.5]; frequencia: 1 intervalo: (7.5, 10.0]; frequencia: 0 intervalo: (10.0, 12.5]; frequencia: 1 intervalo: (12.5, 15.0]; frequencia: 0 intervalo: (15.0, 17.5]; frequencia: 0 intervalo: (17.5, 20.0]; frequencia: 0 intervalo: (20.0, 22.5]; frequencia: 0 intervalo: (22.5, 25.0]; frequencia: 0 intervalo: (25.0, 27.5]; frequencia: 0 intervalo: (27.5, 30.0]; frequencia: 1
+									100 bar intervalo: (4.973999999999999, 7.5]; frequencia: 1
+									101 bar intervalo: (7.5, 10.0]; frequencia: 0
+									102 bar intervalo: (10.0, 12.5]; frequencia: 1
+									103 bar intervalo: (12.5, 15.0]; frequencia: 0
+									104 bar intervalo: (15.0, 17.5]; frequencia: 0
+									105 bar intervalo: (17.5, 20.0]; frequencia: 0
+									106 bar intervalo: (20.0, 22.5]; frequencia: 0
+									107 bar intervalo: (22.5, 25.0]; frequencia: 0
+									108 bar intervalo: (25.0, 27.5]; frequencia: 0
+									109 bar intervalo: (27.5, 30.0]; frequencia: 1
+				110 button (collapsed) Dados do gráfico, Secondary Actions: Expand
+					111 text Dados do gráfico
+				112 heading Registros filtrados, Value: 3, ID: registros-filtrados
+					113 text Registros filtrados
+					114 link Description: Link to heading, Value: 127.0.0.1:18653/#registros-filtrados
+				115 container
+					116 button Show/hide columns
+					117 button Download as CSV
+					118 button Search
+					119 button Fullscreen
+					120 container
+						121 image
+							122 table
+								123 row produto quantidade categoria
+									124 cell (selectable) produto
+									125 cell (selectable) quantidade
+									126 cell (selectable) categoria
+								127 container
+									128 row (selectable) Caderno 12 Papelaria
+										129 cell (selectable) Value: Caderno, ID: glide-cell-0-0
+										130 cell (selectable) Value: 12, ID: glide-cell-1-0
+										131 cell (selectable) Value: Papelaria, ID: glide-cell-2-0
+									132 row (selectable) Lapis 30 Papelaria
+										133 cell (selectable) Value: Lapis, ID: glide-cell-0-1
+										134 cell (selectable) Value: 30, ID: glide-cell-1-1
+										135 cell (selectable) Value: Papelaria, ID: glide-cell-2-1
+									136 row (selectable) Cabo 5 Eletronicos
+										137 cell (selectable) Value: Cabo, ID: glide-cell-0-2
+										138 cell (selectable) Value: 5, ID: glide-cell-1-2
+										139 cell (selectable) Value: Eletronicos, ID: glide-cell-2-2
+						140 image
+				141 button Exportar dados filtrados
+					142 text Exportar dados filtrados
+				143 text OneWorld — Protótipo 02 · dados em SQLite local · IA simulada nesta versão.
+
+The focused UI element is 83 combo box (collapsed, settable) Description: Coluna numérica, Value: quantidade, ID: react-aria6062310514-:ria:, Secondary Actions: Expand
