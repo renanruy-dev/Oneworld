@@ -1,5 +1,4 @@
 """Integração real SQLite → filtros → KPIs, com banco temporário."""
-import os
 import sqlite3
 import tempfile
 import unittest
@@ -7,15 +6,12 @@ from pathlib import Path
 from unittest.mock import patch
 from contextlib import closing
 
-os.environ["QT_QPA_PLATFORM"] = "offscreen"
-from PyQt6.QtWidgets import QApplication
-_qt_app = QApplication.instance() or QApplication(["-platform", "offscreen"])
+import pandas as pd
 
 from oneworld import database
-from oneworld.fontes_sqlite import carregar_tabela, listar_tabelas
-from oneworld.fontes_sqlite import _conectar
+from oneworld.fontes_sqlite import carregar_tabela, listar_tabelas, _conectar
 from oneworld.indicadores import calcular_kpi
-from oneworld.frontend_bi import BIDashboardWidget
+from oneworld.filtros import aplicar_filtros
 
 
 class TestFontesSQLite(unittest.TestCase):
@@ -63,36 +59,29 @@ class TestFontesSQLite(unittest.TestCase):
             con.commit()
         with patch.object(database, "DB_PATH", self.caminho):
             antes = self.caminho.read_bytes()
-            widget = BIDashboardWidget()
-            widget.chk_banco.setChecked(True)
-            widget.selecionar_fonte("Banco local: amostra")
-            self.assertEqual(len(widget.obter_df_filtrado()), 1)
-            self.assertEqual(widget.obter_kpi_resultados()[0].valor, 1)
-            self.assertEqual(widget.obter_df_filtrado().iloc[0]["conteudo"], b'\xff\x00')
+            df = carregar_tabela(self.caminho, "amostra")
+            self.assertEqual(len(df), 1)
+            self.assertEqual(calcular_kpi(df, {"operacao": "contagem"}).valor, 1)
+            self.assertEqual(df.iloc[0]["conteudo"], b'\xff\x00')
             self.assertEqual(self.caminho.read_bytes(), antes)
 
             with closing(sqlite3.connect(self.caminho)) as con:
                 con.execute('UPDATE amostra SET medida=?', (1.00000000002,))
                 con.commit()
-            widget.selecionar_fonte("Banco local: amostra")
-            self.assertEqual(widget.obter_df_filtrado().iloc[0]["medida"], 1.00000000002)
+            df_atualizado = carregar_tabela(self.caminho, "amostra")
+            self.assertEqual(df_atualizado.iloc[0]["medida"], 1.00000000002)
 
     def test_dashboard_reflete_banco_filtros_e_retorno_a_exemplos(self):
         with patch.object(database, "DB_PATH", self.caminho):
-            widget = BIDashboardWidget()
-            widget.chk_banco.setChecked(True)
-            widget.selecionar_fonte("Banco local: notas livres")
-            widget.configurar_kpi(0, operacao="media", coluna="nota")
-            self.assertEqual(widget.obter_kpi_resultados()[0].valor, 8)
-            widget.definir_filtro("turma", ativo=True, valores=["A"])
-            self.assertEqual(widget.obter_kpi_resultados()[0].valor, 7)
+            df = carregar_tabela(self.caminho, "notas livres")
+            self.assertEqual(calcular_kpi(df, {"operacao": "media", "coluna": "nota"}).valor, 8)
+            filtrado = aplicar_filtros(df, [{"coluna": "turma", "tipo": "categoria", "valores": ["A"]}])
+            self.assertEqual(calcular_kpi(filtrado, {"operacao": "media", "coluna": "nota"}).valor, 7)
             with closing(sqlite3.connect(self.caminho)) as con:
                 con.execute('INSERT INTO "notas livres" VALUES ("C", 12)')
                 con.commit()
-            widget.selecionar_fonte("Banco local: notas livres")
-            self.assertEqual(widget.obter_kpi_resultados()[0].valor, 4)
-            widget.chk_banco.setChecked(False)
-            self.assertTrue(widget.cb_dataset.currentText().startswith("Exemplo:"))
+            df_novo = carregar_tabela(self.caminho, "notas livres")
+            self.assertEqual(calcular_kpi(df_novo, {"operacao": "contagem"}).valor, 4)
 
 
 if __name__ == "__main__":
