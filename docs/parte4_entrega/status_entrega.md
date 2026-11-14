@@ -12,7 +12,7 @@ Atualizado em 14/11/2026 para a branch `felipe/parte-oneworld`.
 
 ## Informações pessoais necessárias
 
-O [relato individual](relato_individual_base.md) já contém um texto corrido com atuação, escopo, assistência de IA, funcionalidades, decisões técnicas e resultados recuperados das conversas e dos registros. Restam três complementos reunidos no próprio relato — identificação e período, uma frase sobre o aprendizado e confirmação da participação em atividades com o parceiro — além da revisão final do integrante. A dificuldade em decidir os KPIs e a ausência de interação com outras partes do projeto já foram registradas conforme informação de Felipe.
+O [relato individual](relato_individual_base.md) já contém um texto corrido com atuação, escopo, assistência de IA, funcionalidades, decisões técnicas e resultados recuperados das conversas e dos registros. A identificação acadêmica e o período 2026.2 foram preenchidos com os dados fornecidos pelo integrante. Restam dois complementos reunidos no próprio relato — uma frase sobre o aprendizado e confirmação da participação em atividades com o parceiro — além da revisão final do integrante. A dificuldade em decidir os KPIs e a ausência de interação com outras partes do projeto já foram registradas conforme informação de Felipe.
 
 ## Fechamento com a equipe
 

@@ -1,6 +1,15 @@
-# Relato individual — Felipe — OneWorld
+# Relato individual — Felipe Carreira da Cunha Antunes — OneWorld
 
 Versão para revisão, atualizada em 14/11/2026. Texto elaborado com base nas conversas sobre a Parte 4, no histórico Git e nas evidências locais. As informações ainda necessárias estão reunidas ao final.
+
+## Identificação
+
+- Nome completo — Felipe Carreira da Cunha Antunes
+- Curso — Ciência da Computação
+- Disciplina — Tópicos de Big Data em Python
+- Turma — WYD6399
+- Matrícula — 202502579527
+- Período letivo de participação — 2026.2
 
 ## Participação no projeto
 
@@ -34,9 +43,8 @@ Os materiais consultados contêm testes técnicos, exemplos sintéticos e instru
 
 ## Complementos para fechar a versão pessoal
 
-1. **Identificação e período.** Informar nome completo, curso, turma, disciplina e matrícula conforme o modelo exigido, além do período efetivo de participação. Os registros técnicos consultados abrangem outubro e novembro de 2026.
-2. **Aprendizado pessoal.** Informar, em uma frase, o que aprendeu ao decidir os KPIs. A dificuldade e a ausência de interação com outras partes já foram incorporadas conforme seu relato.
-3. **Atividade com o parceiro.** Confirmar se participou de demonstração, capacitação ou conversa com o parceiro. Se participou, informar quando, seu papel e o retorno recebido. Se ainda não participou, basta registrar essa situação.
+1. **Aprendizado pessoal.** Informar, em uma frase, o que aprendeu ao decidir os KPIs. A dificuldade e a ausência de interação com outras partes já foram incorporadas conforme seu relato.
+2. **Atividade com o parceiro.** Confirmar se participou de demonstração, capacitação ou conversa com o parceiro. Se participou, informar quando, seu papel e o retorno recebido. Se ainda não participou, basta registrar essa situação.
 
 Após esses complementos, revisar o texto conforme o modelo da disciplina e confirmar que a descrição corresponde à sua participação.
 
