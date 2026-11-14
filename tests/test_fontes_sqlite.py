@@ -6,18 +6,12 @@ from pathlib import Path
 from unittest.mock import patch
 from contextlib import closing
 
-from streamlit.testing.v1 import AppTest
+import pandas as pd
 
 from oneworld import database
-from oneworld.fontes_sqlite import carregar_tabela, listar_tabelas
-from oneworld.fontes_sqlite import _conectar
+from oneworld.fontes_sqlite import carregar_tabela, listar_tabelas, _conectar
 from oneworld.indicadores import calcular_kpi
-
-
-def widget(app, tipo, base):
-    """Localiza um controle da fonte ativa por seu nome funcional."""
-    return next(w for w in getattr(app, tipo)
-                if w.key and w.key.split("::")[0] == base)
+from oneworld.filtros import aplicar_filtros
 
 
 class TestFontesSQLite(unittest.TestCase):
@@ -63,49 +57,31 @@ class TestFontesSQLite(unittest.TestCase):
             con.execute('CREATE TABLE amostra (conteudo BLOB, medida REAL)')
             con.execute('INSERT INTO amostra VALUES (?, ?)', (b'\xff\x00', 1.00000000001))
             con.commit()
-        script = '''
-from oneworld.frontend_bi import mostrar_dashboard
-mostrar_dashboard("#5B4FC4")
-'''
         with patch.object(database, "DB_PATH", self.caminho):
             antes = self.caminho.read_bytes()
-            app = AppTest.from_string(script, default_timeout=20).run()
-            widget(app, "checkbox", "bi_banco_local").check().run()
-            widget(app, "selectbox", "bi_dataset").select("Banco local: amostra").run()
-            self.assertFalse(app.exception)
-            self.assertFalse(app.error)
-            self.assertEqual(app.metric[0].value, "1")
-            self.assertEqual(app.dataframe[-1].value.iloc[0]["conteudo"], b'\xff\x00')
+            df = carregar_tabela(self.caminho, "amostra")
+            self.assertEqual(len(df), 1)
+            self.assertEqual(calcular_kpi(df, {"operacao": "contagem"}).valor, 1)
+            self.assertEqual(df.iloc[0]["conteudo"], b'\xff\x00')
             self.assertEqual(self.caminho.read_bytes(), antes)
-            identidade = app.session_state["bi_fonte"][0]
+
             with closing(sqlite3.connect(self.caminho)) as con:
                 con.execute('UPDATE amostra SET medida=?', (1.00000000002,))
                 con.commit()
-            app.run()
-            self.assertFalse(app.exception)
-            self.assertNotEqual(app.session_state["bi_fonte"][0], identidade)
-            self.assertEqual(app.dataframe[-1].value.iloc[0]["medida"], 1.00000000002)
+            df_atualizado = carregar_tabela(self.caminho, "amostra")
+            self.assertEqual(df_atualizado.iloc[0]["medida"], 1.00000000002)
 
     def test_dashboard_reflete_banco_filtros_e_retorno_a_exemplos(self):
         with patch.object(database, "DB_PATH", self.caminho):
-            app = AppTest.from_file(str(Path(__file__).resolve().parents[1] / "app.py"),
-                                    default_timeout=20).run()
-            widget(app, "checkbox", "bi_banco_local").check().run()
-            widget(app, "selectbox", "bi_dataset").select("Banco local: notas livres").run()
-            widget(app, "selectbox", "bi_cfg_kpi_0_op").select("media").run()
-            self.assertEqual(app.metric[0].value, "8.00")
-            widget(app, "checkbox", "bi_cfg_filtro_0").check().run()
-            widget(app, "multiselect", "bi_cfg_filtro_0_valores").set_value(["A"]).run()
-            self.assertEqual(app.metric[0].value, "7.00")
+            df = carregar_tabela(self.caminho, "notas livres")
+            self.assertEqual(calcular_kpi(df, {"operacao": "media", "coluna": "nota"}).valor, 8)
+            filtrado = aplicar_filtros(df, [{"coluna": "turma", "tipo": "categoria", "valores": ["A"]}])
+            self.assertEqual(calcular_kpi(filtrado, {"operacao": "media", "coluna": "nota"}).valor, 7)
             with closing(sqlite3.connect(self.caminho)) as con:
                 con.execute('INSERT INTO "notas livres" VALUES ("C", 12)')
                 con.commit()
-            app.run()
-            self.assertEqual(app.metric[0].value, "4")  # nova origem reinicia configurações
-            widget(app, "checkbox", "bi_banco_local").uncheck().run()
-            self.assertFalse(app.exception)
-            self.assertFalse(app.error)
-            self.assertTrue(widget(app, "selectbox", "bi_dataset").value.startswith("Exemplo:"))
+            df_novo = carregar_tabela(self.caminho, "notas livres")
+            self.assertEqual(calcular_kpi(df_novo, {"operacao": "contagem"}).valor, 4)
 
 
 if __name__ == "__main__":

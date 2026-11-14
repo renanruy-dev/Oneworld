@@ -111,11 +111,14 @@ class AlertBox(QFrame):
         self.setObjectName(nomes.get(tipo, "AlertInfo"))
         lay = QHBoxLayout(self)
         lay.setContentsMargins(14, 10, 14, 10)
-        lbl = QLabel(texto)
-        lbl.setWordWrap(True)
+        self.lbl = QLabel(texto)
+        self.lbl.setWordWrap(True)
         if tipo in cores_txt:
-            lbl.setStyleSheet(f"color: {cores_txt[tipo]}; font-weight: 600;")
-        lay.addWidget(lbl)
+            self.lbl.setStyleSheet(f"color: {cores_txt[tipo]}; font-weight: 600;")
+        lay.addWidget(self.lbl)
+
+    def definir_texto(self, texto: str):
+        self.lbl.setText(texto)
 
 
 class MetricCard(QFrame):
@@ -883,7 +886,37 @@ class OneWorldWindow(QMainWindow):
     # ── PÁGINA 1: DASHBOARD ──
     def pagina_dashboard(self):
         v = self.vocab()
-        self._cabecalho("Dashboard", "Visão geral dos dados e indicadores do negócio")
+        self._cabecalho("Dashboard", "Análise configurável de conjuntos de dados e indicadores do negócio")
+
+        abas = QTabWidget()
+
+        # Aba 1: Dashboard BI Genérico
+        w_bi = QWidget()
+        lay_bi = QVBoxLayout(w_bi)
+        lay_bi.setContentsMargins(12, 12, 12, 12)
+        lay_bi.setSpacing(12)
+        from .frontend_bi import BIDashboardWidget
+
+        self.bi_widget = BIDashboardWidget(self.cfg, parent=self)
+        lay_bi.addWidget(self.bi_widget)
+        abas.addTab(w_bi, "📈 Dashboard BI Genérico")
+
+        # Aba 2: Visão Geral (Negócio)
+        w_negocio = QWidget()
+        lay_neg = QVBoxLayout(w_negocio)
+        lay_neg.setContentsMargins(12, 12, 12, 12)
+        lay_neg.setSpacing(12)
+        self._montar_dashboard_negocio(lay_neg)
+        abas.addTab(w_negocio, "🏢 Visão Geral (Negócio)")
+
+        aba_idx = self.estado.get("dash_aba_ativa", 0)
+        abas.setCurrentIndex(aba_idx)
+        abas.currentChanged.connect(lambda idx: self.estado.__setitem__("dash_aba_ativa", idx))
+
+        self.lay_pagina.addWidget(abas)
+
+    def _montar_dashboard_negocio(self, container_lay: QVBoxLayout):
+        v = self.vocab()
         e, cv = self.dados("eventos"), self.dados("convidados")
 
         barra_f = QHBoxLayout()
@@ -914,7 +947,7 @@ class OneWorldWindow(QMainWindow):
         col_f2.addWidget(ms_status)
         barra_f.addLayout(col_f2, stretch=2)
 
-        self.lay_pagina.addLayout(barra_f)
+        container_lay.addLayout(barra_f)
 
         f = bk.filtrar_eventos(e, mes_atual, stat_atual)
         conf = int((cv["confirmacao"] == "Confirmado").sum()) if not cv.empty else 0
@@ -926,12 +959,12 @@ class OneWorldWindow(QMainWindow):
         linha_m.addWidget(MetricCard(v["metric_valor"], self.moeda(f["valor"].sum())))
         linha_m.addWidget(MetricCard(v["metric_pend"], int(f["status"].isin(["Pendente", "Em planejamento"]).sum())))
         linha_m.addWidget(MetricCard(v["metric_ent2_conf"], f"{conf} de {len(cv)}"))
-        self.lay_pagina.addLayout(linha_m)
+        container_lay.addLayout(linha_m)
 
         cap = QLabel(v["legenda_valor"])
         cap.setObjectName("Caption")
-        self.lay_pagina.addWidget(cap)
-        self.lay_pagina.addWidget(Divider())
+        container_lay.addWidget(cap)
+        container_lay.addWidget(Divider())
 
         linha_g = QHBoxLayout()
         linha_g.setSpacing(16)
@@ -971,12 +1004,12 @@ class OneWorldWindow(QMainWindow):
         linha_g.addLayout(col_g1, stretch=20)
         linha_g.addLayout(col_g2, stretch=20)
         linha_g.addLayout(col_g3, stretch=13)
-        self.lay_pagina.addLayout(linha_g)
+        container_lay.addLayout(linha_g)
 
-        self.lay_pagina.addWidget(self._subtitulo(v["proximos_titulo"]))
+        container_lay.addWidget(self._subtitulo(v["proximos_titulo"]))
         prox = f[pd.to_datetime(f["data"]).dt.date >= date.today()] if not f.empty else f
         df_exibir = (prox if not prox.empty else f).drop(columns=["id"], errors="ignore")
-        self.lay_pagina.addWidget(
+        container_lay.addWidget(
             PaginatedTableWidget(
                 self.formatar(df_exibir, "eventos"),
                 linhas_por_pagina=self.cfg["linhas"],
