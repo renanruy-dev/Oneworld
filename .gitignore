@@ -3,7 +3,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-# Ambientes virtuais (Virtual environments)
+# Virtual environments
 .venv/
 venv/
 ENV/
@@ -11,19 +11,25 @@ env/
 env.bak/
 venv.bak/
 
-# Banco de dados local e backups
+# Local database and backups
 *.db
 *.sqlite
 *.sqlite3
 oneworld.db
 backups/
 
-# Logs e arquivos temporários
+# Secrets e variaveis locais
+.streamlit/secrets.toml
+.env
+.env.*
+!.env.example
+
+# Logs e arquivos temporarios
 *.log
 *.tmp
 *.temp
 
-# Arquivos do sistema operacional
+# Operating system files
 .DS_Store
 Thumbs.db
 desktop.ini
@@ -35,7 +41,7 @@ desktop.ini
 ~$*
 oneworld_modelo_base.py
 
-# Editores e IDEs
+# Editors and IDEs
 .vscode/
 .idea/
 *.sublime-project
