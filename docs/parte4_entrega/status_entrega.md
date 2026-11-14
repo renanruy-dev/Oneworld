@@ -12,7 +12,7 @@ Atualizado em 14/11/2026 para a branch `felipe/parte-oneworld`.
 
 ## Informações pessoais necessárias
 
-Finalizar o [relato individual](relato_individual_base.md) com nome completo, identificação acadêmica, período, tarefas efetivamente realizadas, uma dificuldade concreta, aprendizados e participação em atividades com o parceiro. O histórico associa o commit técnico à conta `felipecarreira07`; a descrição da experiência individual depende do integrante.
+O [relato individual](relato_individual_base.md) já contém um texto corrido com atuação, escopo, assistência de IA, funcionalidades, decisões técnicas e resultados recuperados das conversas e dos registros. Restam três complementos reunidos no próprio relato — identificação e período, uma reflexão pessoal e confirmação da participação em atividades com o parceiro — além da revisão final do integrante.
 
 ## Fechamento com a equipe
 
