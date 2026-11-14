@@ -1,3 +1,4 @@
 PyQt6>=6.6
 pandas
 openpyxl
+litellm==1.83.14
