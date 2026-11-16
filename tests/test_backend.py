@@ -106,4 +106,31 @@ def test_validar_planilha():
     assert len(res["ok"]) == 2
     assert len(res["erros"]) == 0
     assert res["ok"][0]["cliente"] == "Empresa Alfa"
-    assert res["ok"][0]["valor"] ==
+    assert res["ok"][0]["valor"] == 5000.
+
+
+
+def test_responder_ia():
+    e = pd.DataFrame([
+        {"id": 1, "data": "2026-11-01", "cliente": "Empresa Alfa", "local": "Matriz", "convidados": 50, "valor": 10000.0, "status": "Confirmado"}
+    ])
+    cv = pd.DataFrame([
+        {"id": 1, "evento": "Empresa Alfa", "nome": "Item 1", "mesa": "01", "acompanhantes": 0, "contato": "", "restricao": "—", "confirmacao": "Confirmado"}
+    ])
+    config = cfg.PADROES
+    resp = bk.responder_ia("Qual é o valor total?", e, cv, config)
+    assert "R$" in resp
+    assert "10.000,00" in resp
+
+
+def test_gerar_markdown():
+    e = pd.DataFrame([
+        {"id": 1, "data": "2026-11-01", "cliente": "Empresa Alfa", "local": "Matriz", "convidados": 50, "valor": 10000.0, "status": "Confirmado"}
+    ])
+    cv = pd.DataFrame([
+        {"id": 1, "evento": "Empresa Alfa", "nome": "Item 1", "mesa": "01", "acompanhantes": 0, "contato": "", "restricao": "—", "confirmacao": "Confirmado"}
+    ])
+    config = cfg.PADROES
+    md = bk.gerar_markdown(e, cv, config)
+    assert "# OneWorld" in md
+    assert "Empresa Alfa" in md
