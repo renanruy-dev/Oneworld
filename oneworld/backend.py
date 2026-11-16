@@ -61,7 +61,7 @@ def parse_valor(v):
 
     if "," in s:
         s = s.replace(".", "").replace(",", ".")
-    elif re.fullmatch(r"-?\d{1,3}(?:\.\d{3})+", s):
+    elif re.fullmatch(r"-?[1-9]\d{0,2}(?:\.\d{3})+", s):
         s = s.replace(".", "")
 
     try:
