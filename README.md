@@ -28,6 +28,7 @@ O sistema opera de forma 100% local com banco de dados **SQLite**, garantindo to
 - 📋 **Gestão de Operações & Cadastros:** Cadastro completo, acompanhamento de status (*Em planejamento*, *Confirmado*, *Concluído*, *Pendente*) e controle de valores.
 - 📥 **Importação Inteligente de Planilhas:** Mapeamento automático de cabeçalhos com detecção de sinônimos para arquivos `.xlsx`, `.xls`, `.csv` e `.json`.
 - 💡 **Orientação com IA & Exportação:** Módulo de análises com geração de relatórios e exportação estruturada em Markdown para Decision Intelligence.
+- 🧾 **Planilha padrão e IA externa:** Exportação em XLSX padrão com prompts prontos para levar manualmente a um chat de IA (sem chave de API) e reimportação com prévia e confirmação. Veja [Planilha padrão e IA externa](#-planilha-padrão-e-ia-externa).
 - 📝 **Bloco de Anotações:** Registro de observações, pendências e anotações com datas previstas.
 - 💾 **Backup e Segurança:** Cópia rápida do banco local e backup completo em JSON, com restauração (substituir os dados atuais) ou complementação (adicionar apenas o que falta). Veja [Backup e restauração](#-backup-e-restauração).
 - 🎨 **Personalização Visual:** Suporte a temas Claro, Escuro e Automático com paleta de cores corporativa personalizada.
@@ -45,6 +46,7 @@ Oneworld/
 │   ├── config.py            # Constantes, perfis de negócio e esquemas de dados
 │   ├── database.py          # Camada de persistência e acesso a dados (SQLite)
 │   ├── frontend.py          # Interface gráfica desktop nativa e componentes (PyQt6)
+│   ├── planilha_padrao.py   # Planilha padrão XLSX, prompts para IA externa e reimportação com prévia
 │   └── tema.py              # Definições de temas Claro/Escuro e estilos QSS
 ├── app.py                   # Ponto de entrada da aplicação desktop
 ├── Iniciar_OneWorld.bat     # Inicializador rápido para Windows (dois cliques)
@@ -148,6 +150,62 @@ Clique em **Importar backup...** e escolha o arquivo. Antes de qualquer alteraç
 - **Não atualiza registros existentes.** Um registro que foi editado (ex.: mesmo cliente e data, outro valor) é considerado novo e é adicionado ao lado do antigo. Para voltar exatamente ao estado do backup, use *Substituir dados atuais*.
 - O vínculo entre cadastros e operações (o texto do campo de vínculo) é gravado exatamente como está no backup.
 - Um campo personalizado do backup é **incompatível** quando tem o nome de uma coluna padrão (ex.: "Valor") ou é parecido, mas não idêntico, a um campo atual (ex.: "fornecedor" × "Fornecedor"). Nesses casos o conflito é mostrado antes da gravação: você pode cancelar ou continuar sem adicionar esses campos à lista. Os valores deles continuam gravados nos dados extras dos registros importados.
+
+---
+
+## 🧾 Planilha padrão e IA externa
+
+Fica em **Orientação IA › Planilha padrão e IA externa**. O OneWorld **não chama nenhuma IA** neste fluxo: você leva a planilha e o prompt, você mesmo, a um chat externo (ChatGPT, Gemini, Claude...). Ao fazer isso, os dados saem do seu computador.
+
+### Exportar
+
+1. Marque as tabelas: Operações e Cadastros (marcadas por padrão) e Anotações (opcional).
+2. Se quiser, filtre por período. Operações e Anotações usam a própria data. **Cadastros não têm data**: entram quando a operação vinculada (mesmo texto em `evento` e `cliente`) está no período. Se houver operações com o mesmo nome dentro e fora do período, esses cadastros ficam de fora por vínculo ambíguo, e o arquivo informa quantos.
+3. Escolha o tipo:
+   - **Para análise:** resumo por mês e dados **sem** nomes, contatos, observações e campos personalizados (salvo se marcados), sem identificadores do sistema. O arquivo é marcado como *somente análise* e **não pode ser importado de volta**. Atenção: textos livres ainda podem conter informações pessoais.
+   - **Para edição e reimportação:** todos os campos, com `id_oneworld` e `controle`. Antes de gerar, o sistema mostra as tabelas e quantidades e pede confirmação, avisando que nomes e contatos estarão no arquivo.
+4. **Baixar modelo vazio** gera a mesma estrutura sem registros, para preencher do zero.
+5. **Copiar prompt de análise** e **Copiar prompt de preenchimento** copiam textos que correspondem às tabelas marcadas. Os prompts também vão na aba `LEIA-ME` do arquivo.
+
+### Estrutura do arquivo (formato `oneworld-planilha`, versão 1)
+
+| Aba | Conteúdo | Na importação |
+|---|---|---|
+| `LEIA-ME` | Instruções e prompts | Ignorada |
+| `OneWorld` | Identificação (formato, versão, tipo, `base_id`, data de geração, abas) e informações (período, contagens) | Identificação é obrigatória e não pode mudar; contagens são só informativas |
+| `Dicionario` | Tipo, obrigatoriedade, significado do vazio e valores permitidos de cada coluna | Ignorada |
+| `Resumo_Periodos` | Totais por mês: quantidade de operações e **valor previsto** | Ignorada |
+| `Operacoes`, `Cadastros`, `Anotacoes` | Dados, com o cabeçalho na linha 1 | Validadas e importadas |
+
+`valor` é sempre **valor previsto**, não pagamento recebido. O sistema não tem gastos, impostos nem receita realizada.
+
+### Importar
+
+**Importar planilha preenchida...** aceita somente `.xlsx` exportado **para edição** ou o modelo vazio. Primeiro aparece uma **prévia**, com inclusões, alterações, limpezas, vínculos atualizados, duplicados, linhas sem gravação, conflitos e erros. Abrir a prévia ou cancelar não altera nada.
+
+- **Tudo ou nada:** qualquer erro ou conflito bloqueia a confirmação.
+- Ao confirmar, o sistema cria uma cópia do banco em `backups/` (se ela falhar, a importação para), refaz toda a validação dentro de uma transação e grava tudo de uma vez. O registro no histórico de arquivos entra na mesma transação. Se os dados mudaram desde a prévia, nada é gravado e você precisa revisar de novo.
+
+**Como cada linha é tratada:**
+
+- **Linha nova** (`id_oneworld` e `controle` vazios) vira inclusão. Se o conteúdo for idêntico a um registro existente ou a uma linha anterior do arquivo, é marcada como **duplicada** e ignorada.
+- **Linha existente** é identificada por `base_id` + `id_oneworld` + `controle`, nunca por nome ou posição. O `controle` é o SHA-256 do registro como estava na exportação; ele verifica consistência, não autentica o arquivo.
+  - O registro não mudou no sistema e a linha mudou: **alteração**.
+  - O conteúdo da linha já está no sistema: **já aplicada** (reimportar o mesmo arquivo não repete nada).
+  - O registro mudou no sistema e a linha não foi editada: **mantido** como está no sistema.
+  - O registro mudou no sistema e a linha também: **conflito**.
+- **Arquivo de outra base** nunca atualiza registros por coincidência de ID: as linhas são tratadas como inclusões, e as idênticas como duplicadas.
+- **Célula vazia** em coluna presente **limpa** o valor; números ficam 0. A limpeza aparece destacada na prévia. Campos obrigatórios não podem ficar vazios.
+- **Coluna removida** não altera nada. **Linha removida** não exclui nada.
+- **Valores permitidos:** status e situação só aceitam os valores exatos da lista. Datas: `AAAA-MM-DD`, `DD/MM/AAAA` ou célula de data do Excel. Números: célula numérica ou texto como `1.234,56`.
+- **Colunas de texto** precisam conter texto; um número é recusado para não perder zeros à esquerda.
+- **Recusados:** fórmulas, abas ou colunas desconhecidas, campos personalizados inexistentes e abas que não faziam parte da exportação. O OneWorld **não cria tabelas, colunas nem campos** a partir do arquivo.
+
+**Vínculos por texto:** um cadastro aponta para a operação pelo texto do nome, e `cliente` não é único. Por isso:
+
+- Os vínculos são validados no estado final da importação, contando operações novas e renomeadas.
+- Um cadastro que aponta para uma operação inexistente, ou para um nome usado por mais de uma operação, bloqueia a importação.
+- Renomear uma operação atualiza os cadastros vinculados (mesmo os que não estão na planilha) somente quando não há ambiguidade. Se houver duas operações com o nome antigo, ou se outra operação ficar com esse nome, a mudança é bloqueada com a explicação do motivo.
 
 ---
 

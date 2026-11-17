@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
     QColorDialog,
     QComboBox,
     QDateEdit,
+    QDialog,
     QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
@@ -48,6 +49,7 @@ from . import backup as bkp
 from . import database as db
 from . import ia
 from . import mapeamento as mp
+from . import planilha_padrao as pp
 from .config import (
     BACKUP_DIR,
     CAMPOS,
@@ -1677,6 +1679,8 @@ class OneWorldWindow(QMainWindow):
         exp_prev.corpo_layout.addWidget(ed_code)
         self.lay_pagina.addWidget(exp_prev)
 
+        self._secao_planilha_padrao()
+
     # ── PÁGINA 6: ANOTAÇÕES ──
     def pagina_anotacoes(self):
         self._cabecalho("Anotações", "Notas, relatórios e datas previstas")
@@ -2508,6 +2512,401 @@ class OneWorldWindow(QMainWindow):
             self.aplicar_tema()
         self.reconstruir_sidebar()
         self.reconstruir_pagina()
+
+    # ── Planilha padrão e IA externa (fluxo manual, sem chamadas de IA) ──
+    # Diálogos modais passam por _confirmar, _mostrar_mensagem e _revisar_importacao_planilha (testáveis).
+    def _estado_planilha(self) -> dict:
+        return self.estado.setdefault("planilha_padrao", {
+            "tabelas": ["eventos", "convidados"], "tipo": pp.TIPO_ANALISE, "periodo": False,
+            "ini": None, "fim": None, "pessoais": False,
+        })
+
+    def _opcoes_planilha(self, vazio: bool = False) -> pp.OpcoesExportacao:
+        st = self._estado_planilha()
+        ini = fim = None
+        if st["periodo"]:
+            ini = st["ini"] or date.today().replace(day=1)
+            fim = st["fim"] or date.today()
+        return pp.OpcoesExportacao(
+            tipo=pp.TIPO_EDICAO if vazio else st["tipo"],
+            tabelas=tuple(t for t in pp.TABELAS if t in st["tabelas"]),
+            data_inicio=None if vazio else ini, data_fim=None if vazio else fim,
+            incluir_dados_pessoais=bool(st["pessoais"]), vazio=vazio,
+        )
+
+    def _nomes_tabelas_planilha(self) -> dict[str, str]:
+        v = self.vocab()
+        return {"eventos": v["ent1_plural"], "convidados": v["ent2_plural"], "anotacoes": "Anotações"}
+
+    def _secao_planilha_padrao(self):
+        st = self._estado_planilha()
+        nomes = self._nomes_tabelas_planilha()
+        lay = self.lay_pagina
+        lay.addWidget(Divider())
+        lay.addWidget(self._subtitulo("Planilha padrão e IA externa"))
+        cap = QLabel(
+            "Exporte seus dados em uma planilha XLSX padrão, copie um prompt e leve os dois, você mesmo, a um chat "
+            "de IA externo (ChatGPT, Gemini, Claude...). O OneWorld não envia nada automaticamente e não usa chave "
+            "de API aqui. Uma planilha preenchida pode voltar ao sistema com prévia e confirmação."
+        )
+        cap.setObjectName("Caption")
+        cap.setWordWrap(True)
+        lay.addWidget(cap)
+        lay.addWidget(AlertBox(
+            "Ao enviar a planilha a uma IA externa, os dados saem do seu computador. Textos livres e campos "
+            "personalizados podem conter informações pessoais; revise antes de enviar.", "warning"))
+
+        # Tabelas
+        linha_tab = QHBoxLayout()
+        linha_tab.addWidget(QLabel("<b>Tabelas:</b>"))
+        for tab in pp.TABELAS:
+            chk = QCheckBox(nomes[tab].replace("&", "&&"))
+            chk.setChecked(tab in st["tabelas"])
+
+            def alternar(marcado, t=tab):
+                if marcado and t not in st["tabelas"]:
+                    st["tabelas"].append(t)
+                elif not marcado and t in st["tabelas"]:
+                    st["tabelas"].remove(t)
+
+            chk.toggled.connect(alternar)
+            linha_tab.addWidget(chk)
+        linha_tab.addStretch(1)
+        lay.addLayout(linha_tab)
+
+        # Período
+        linha_per = QHBoxLayout()
+        chk_per = QCheckBox("Filtrar por período:")
+        chk_per.setChecked(bool(st["periodo"]))
+        hoje = date.today()
+        ini = st["ini"] or hoje.replace(day=1)
+        fim = st["fim"] or hoje
+        de_ini = QDateEdit(QDate(ini.year, ini.month, ini.day))
+        de_fim = QDateEdit(QDate(fim.year, fim.month, fim.day))
+        for de in (de_ini, de_fim):
+            de.setCalendarPopup(True)
+            de.setDisplayFormat("dd/MM/yyyy")
+            de.setEnabled(bool(st["periodo"]))
+
+        def alternar_periodo(marcado):
+            st["periodo"] = marcado
+            de_ini.setEnabled(marcado)
+            de_fim.setEnabled(marcado)
+
+        chk_per.toggled.connect(alternar_periodo)
+        de_ini.dateChanged.connect(lambda q: st.__setitem__("ini", date(q.year(), q.month(), q.day())))
+        de_fim.dateChanged.connect(lambda q: st.__setitem__("fim", date(q.year(), q.month(), q.day())))
+        linha_per.addWidget(chk_per)
+        linha_per.addWidget(QLabel("de"))
+        linha_per.addWidget(de_ini)
+        linha_per.addWidget(QLabel("até"))
+        linha_per.addWidget(de_fim)
+        linha_per.addStretch(1)
+        lay.addLayout(linha_per)
+        cap_per = QLabel(
+            f"O período usa a data de {nomes['eventos']} e de Anotações. {nomes['convidados']} não têm data própria: "
+            f"entram quando a operação vinculada (mesmo texto) está no período. Se houver operações com o mesmo "
+            "nome dentro e fora do período, esses cadastros ficam de fora por vínculo ambíguo (o arquivo informa "
+            "quantos)."
+        )
+        cap_per.setObjectName("Caption")
+        cap_per.setWordWrap(True)
+        lay.addWidget(cap_per)
+
+        # Tipo de exportação
+        linha_tipo = QHBoxLayout()
+        linha_tipo.addWidget(QLabel("<b>Exportar:</b>"))
+        grp = QButtonGroup(self.page_container)
+        rb_an = QRadioButton("Para análise (sem reimportação)")
+        rb_ed = QRadioButton("Para edição e reimportação")
+        grp.addButton(rb_an)
+        grp.addButton(rb_ed)
+        rb_an.setChecked(st["tipo"] == pp.TIPO_ANALISE)
+        rb_ed.setChecked(st["tipo"] == pp.TIPO_EDICAO)
+        chk_pes = QCheckBox("Incluir nomes, contatos, observações e campos personalizados")
+        chk_pes.setChecked(bool(st["pessoais"]))
+        chk_pes.setEnabled(st["tipo"] == pp.TIPO_ANALISE)
+        chk_pes.toggled.connect(lambda m: st.__setitem__("pessoais", m))
+
+        def mudar_tipo(marcado):
+            st["tipo"] = pp.TIPO_ANALISE if marcado else pp.TIPO_EDICAO
+            chk_pes.setEnabled(marcado)
+
+        rb_an.toggled.connect(mudar_tipo)
+        linha_tipo.addWidget(rb_an)
+        linha_tipo.addWidget(rb_ed)
+        linha_tipo.addStretch(1)
+        lay.addLayout(linha_tipo)
+        lay.addWidget(chk_pes)
+        cap_tipo = QLabel(
+            "Para análise: resumo e dados sem nomes, contatos, observações e campos personalizados (salvo se marcado "
+            "acima), sem identificadores do sistema; não pode ser importado de volta. Para edição: todos os campos, "
+            "com identificadores e controles que permitem reimportar com segurança."
+        )
+        cap_tipo.setObjectName("Caption")
+        cap_tipo.setWordWrap(True)
+        lay.addWidget(cap_tipo)
+
+        linha_btn = QHBoxLayout()
+        botoes = [
+            ("Exportar planilha...", self._exportar_planilha_padrao, True),
+            ("Baixar modelo vazio...", self._exportar_modelo_vazio, False),
+            ("Copiar prompt de análise", self._copiar_prompt_analise, False),
+            ("Copiar prompt de preenchimento", self._copiar_prompt_preenchimento, False),
+        ]
+        for rotulo, acao, primario in botoes:
+            b = QPushButton(rotulo)
+            if primario:
+                b.setObjectName("PrimaryBtn")
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.clicked.connect(acao)
+            linha_btn.addWidget(b)
+        linha_btn.addStretch(1)
+        lay.addLayout(linha_btn)
+
+        linha_imp = QHBoxLayout()
+        btn_imp = QPushButton("Importar planilha preenchida...")
+        btn_imp.setObjectName("PrimaryBtn")
+        btn_imp.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_imp.clicked.connect(self._importar_planilha_padrao)
+        linha_imp.addWidget(btn_imp)
+        cap_imp = QLabel("Somente planilhas exportadas para edição ou o modelo vazio. Nada é gravado sem a sua "
+                         "confirmação após a prévia.")
+        cap_imp.setObjectName("Caption")
+        cap_imp.setWordWrap(True)
+        linha_imp.addWidget(cap_imp, stretch=1)
+        lay.addLayout(linha_imp)
+
+    def _abas_selecionadas(self) -> list[str]:
+        return [pp.ABA_DA_TABELA[t] for t in pp.TABELAS if t in self._estado_planilha()["tabelas"]]
+
+    def _salvar_xlsx_dialogo(self, titulo: str, nome: str) -> Path | None:
+        pasta = BACKUP_DIR if BACKUP_DIR.is_dir() else Path.home()
+        caminho, _ = QFileDialog.getSaveFileName(self, titulo, str(pasta / nome), "Planilha Excel (*.xlsx)")
+        if not caminho:
+            return None
+        destino = Path(caminho)
+        return destino if destino.suffix.lower() == ".xlsx" else destino.with_name(destino.name + ".xlsx")
+
+    def _exportar_planilha_padrao(self, _=None, vazio: bool = False):
+        opcoes = self._opcoes_planilha(vazio=vazio)
+        nomes = self._nomes_tabelas_planilha()
+        if not opcoes.tabelas:
+            self._mostrar_mensagem("aviso", "Planilha padrão", "Marque ao menos uma tabela para exportar.")
+            return
+        try:
+            if opcoes.tipo == pp.TIPO_EDICAO and not vazio:
+                contagens, excluidos = pp.contar_para_exportacao(opcoes)
+                linhas = [[nomes[t], n] for t, n in contagens.items()]
+                fora = "".join(f"<li>{html.escape(k)}: {n}</li>" for k, n in excluidos.items())
+                texto = (
+                    "O arquivo <b>para edição e reimportação</b> terá todos os campos das tabelas escolhidas, "
+                    "<b>inclusive nomes, contatos, observações e campos personalizados</b>:<br><br>"
+                    + self._tabela_html(["Tabela", "Registros"], linhas)
+                    + (f"<br>Ficarão fora do arquivo:<ul>{fora}</ul>" if fora else "<br>")
+                    + "Se você enviar este arquivo a uma IA externa, esses dados sairão do seu computador.<br><br>"
+                    "Confirma as tabelas escolhidas?"
+                )
+                if not self._confirmar("Exportar planilha para edição", texto, "Exportar"):
+                    return
+            sufixo = "modelo_vazio" if vazio else ("edicao" if opcoes.tipo == pp.TIPO_EDICAO else "analise")
+            destino = self._salvar_xlsx_dialogo("Salvar planilha padrão",
+                                                f"oneworld_planilha_{sufixo}_{datetime.now():%Y%m%d_%H%M}.xlsx")
+            if destino is None:
+                return
+            res = pp.exportar_planilha(destino, opcoes)
+        except pp.PlanilhaErro as e:
+            self._mostrar_mensagem("erro", "Falha ao exportar a planilha", html.escape(str(e)))
+            return
+        except Exception as e:  # noqa: BLE001 — exportação não altera dados; mostra o erro sem derrubar o app
+            self._mostrar_mensagem("erro", "Falha ao exportar a planilha", html.escape(f"Erro inesperado: {e}"))
+            return
+        resumo = ", ".join(f"{nomes[t]}: {n}" for t, n in res.contagens.items())
+        tipo_txt = ("modelo vazio" if vazio else
+                    "para edição e reimportação" if res.tipo == pp.TIPO_EDICAO else "somente para análise")
+        self.aviso(f"Planilha padrão exportada ({tipo_txt}): {res.caminho.name}")
+        msg = f"Planilha {tipo_txt} salva em: {res.caminho}"
+        if not vazio:
+            msg += f" ({resumo})"
+        if res.excluidos:
+            msg += " — fora do arquivo: " + "; ".join(f"{k}: {n}" for k, n in res.excluidos.items())
+        self.flash(msg)
+        self.reconstruir_pagina()
+
+    def _exportar_modelo_vazio(self):
+        self._exportar_planilha_padrao(vazio=True)
+
+    def _copiar_texto(self, texto: str, aviso: str):
+        QApplication.clipboard().setText(texto)
+        self.flash(aviso)
+        self.reconstruir_pagina()
+
+    def _copiar_prompt_analise(self):
+        abas = self._abas_selecionadas()
+        if not abas:
+            self._mostrar_mensagem("aviso", "Planilha padrão", "Marque ao menos uma tabela.")
+            return
+        self._copiar_texto(pp.prompt_analise(abas),
+                           f"Prompt de análise copiado (abas: {', '.join(abas)}). Cole no chat junto com a planilha.")
+
+    def _copiar_prompt_preenchimento(self):
+        abas = self._abas_selecionadas()
+        if not abas:
+            self._mostrar_mensagem("aviso", "Planilha padrão", "Marque ao menos uma tabela.")
+            return
+        self._copiar_texto(pp.prompt_preenchimento(abas, self.campos_personalizados),
+                           f"Prompt de preenchimento copiado (abas: {', '.join(abas)}). Use-o com a planilha "
+                           "exportada para edição ou com o modelo vazio.")
+
+    def _importar_planilha_padrao(self):
+        try:
+            self._fluxo_importar_planilha()
+        except Exception as e:  # noqa: BLE001 — erro imprevisto não pode derrubar o app; gravação é transacional
+            self._mostrar_mensagem("erro", "Erro inesperado na importação",
+                                   html.escape(f"{e}") + "<br><br>Qualquer gravação em andamento foi desfeita.")
+
+    def _fluxo_importar_planilha(self):
+        pasta = BACKUP_DIR if BACKUP_DIR.is_dir() else Path.home()
+        caminho, _ = QFileDialog.getOpenFileName(self, "Importar planilha padrão", str(pasta),
+                                                 "Planilha padrão do OneWorld (*.xlsx)")
+        if not caminho:
+            return
+        try:
+            arquivo = pp.ler_planilha_padrao(caminho)
+        except pp.PlanilhaInvalida as e:
+            itens = "".join(f"<li>{html.escape(p)}</li>" for p in e.problemas[:30])
+            extra = f"<br>(+{len(e.problemas) - 30} problema(s))" if len(e.problemas) > 30 else ""
+            self._mostrar_mensagem("aviso", "Planilha não pode ser importada",
+                                   f"<ul>{itens}</ul>{extra}<br>Nenhum dado foi alterado.")
+            return
+        try:
+            plano = pp.planejar_importacao(arquivo)
+        except pp.PlanilhaErro as e:
+            self._mostrar_mensagem("erro", "Não foi possível preparar a prévia", html.escape(str(e)))
+            return
+        if not self._revisar_importacao_planilha(plano) or not plano.pode_confirmar:
+            return
+        try:
+            res = pp.aplicar_importacao(arquivo, plano)
+        except pp.PlanoDesatualizado as e:
+            self._mostrar_mensagem("aviso", "Revise a importação novamente", html.escape(str(e)))
+            return
+        except pp.ImportacaoErro as e:
+            self._mostrar_mensagem("erro", "Importação não concluída", html.escape(str(e)))
+            return
+        nomes = self._nomes_tabelas_planilha()
+        linhas = [[nomes[t], res.inclusoes.get(t, 0), res.alteracoes.get(t, 0)] for t in pp.TABELAS
+                  if res.inclusoes.get(t) or res.alteracoes.get(t)]
+        total = sum(res.inclusoes.values()) + sum(res.alteracoes.values())
+        self.aviso(f"Planilha padrão importada: {total} registro(s) gravado(s)")
+        self.reconstruir_pagina()
+        self._mostrar_mensagem(
+            "info", "Planilha importada",
+            self._tabela_html(["Tabela", "Incluídos", "Alterados"], linhas)
+            + (f"<br>Vínculos de cadastros atualizados: {res.propagacoes}" if res.propagacoes else "")
+            + (f"<br>Linhas duplicadas ignoradas: {res.duplicados}" if res.duplicados else "")
+            + f"<br><br>Cópia de segurança do banco anterior: {html.escape(str(res.copia_seguranca))}",
+        )
+
+    def _revisar_importacao_planilha(self, plano: pp.Plano) -> bool:
+        return self._criar_dialogo_previa(plano).exec() == QDialog.DialogCode.Accepted
+
+    def _criar_dialogo_previa(self, plano: pp.Plano) -> QDialog:
+        rot = self.vocab()["rotulos"]
+        nomes = self._nomes_tabelas_planilha()
+
+        def nome_col(col):
+            if col is None:
+                return ""
+            if col.startswith(pp.PREFIXO_CAMPO):
+                return col[len(pp.PREFIXO_CAMPO):]
+            return rot.get(col, col)
+
+        def fmt(v):
+            return "(vazio)" if v is None or v == "" else str(v)
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"Prévia da importação — {plano.arquivo}")
+        dlg.resize(1050, 720)
+        lay = QVBoxLayout(dlg)
+        if plano.erros or plano.conflitos:
+            lay.addWidget(AlertBox("Há erros ou conflitos: nada será gravado. Corrija a planilha (ou exporte "
+                                   "novamente) e importe de novo.", "error"))
+        elif not plano.tem_gravacao:
+            lay.addWidget(AlertBox("Nada a gravar: o conteúdo da planilha já está no sistema.", "info"))
+        else:
+            lay.addWidget(AlertBox("Revise as inclusões, alterações e limpezas. A gravação é feita de uma vez, "
+                                   "com cópia de segurança antes.", "success"))
+        for aviso in plano.avisos:
+            lbl = QLabel("⚠️ " + aviso)
+            lbl.setWordWrap(True)
+            lay.addWidget(lbl)
+
+        grade = QGridLayout()
+        cards = [("Inclusões", len(plano.inclusoes)), ("Alterações", len(plano.alteracoes)),
+                 ("Limpezas", len(plano.limpezas)), ("Vínculos atualizados", len(plano.propagacoes)),
+                 ("Duplicados ignorados", len(plano.duplicados)),
+                 ("Sem gravação", len(plano.sem_mudanca) + len(plano.ja_aplicadas) + len(plano.mantidas)),
+                 ("Conflitos", len(plano.conflitos)), ("Erros", len(plano.erros))]
+        for i, (r, n) in enumerate(cards):
+            grade.addWidget(MetricCard(r, n), i // 4, i % 4)
+        lay.addLayout(grade)
+
+        def conteudo(tab, valores, extras):
+            partes = [f"{nome_col(c)}: {fmt(valores.get(c))}" for c in [x.nome for x in pp.CAMPOS[tab]]
+                      if valores.get(c) not in (None, "")]
+            partes += [f"{k}: {v}" for k, v in (extras or {}).items() if v not in (None, "")]
+            return "; ".join(partes)
+
+        abas = QTabWidget()
+        tabelas = [
+            ("Erros", pd.DataFrame([{"Aba": p.aba, "Linha": p.linha or "", "Coluna": nome_col(p.coluna),
+                                     "Problema": p.mensagem} for p in plano.erros])),
+            ("Conflitos", pd.DataFrame([{"Aba": p.aba, "Linha": p.linha or "", "Coluna": nome_col(p.coluna),
+                                         "Problema": p.mensagem} for p in plano.conflitos])),
+            ("Inclusões", pd.DataFrame([{"Tabela": nomes[i.tabela], "Linha": i.linha,
+                                         "Conteúdo": conteudo(i.tabela, i.valores, i.extras)}
+                                        for i in plano.inclusoes])),
+            ("Alterações", pd.DataFrame([{"Tabela": nomes[a.tabela], "Linha": a.linha, "ID": a.id,
+                                          "Campo": nome_col(m.coluna), "Antes": fmt(m.antes), "Depois": fmt(m.depois),
+                                          "Limpeza": "LIMPA O VALOR" if m.limpeza else ""}
+                                         for a in plano.alteracoes for m in a.mudancas])),
+            ("Limpezas", pd.DataFrame([{"Tabela": nomes[a.tabela], "Linha": a.linha, "ID": a.id,
+                                        "Campo": nome_col(m.coluna), "Valor atual (será limpo)": fmt(m.antes),
+                                        "Fica": fmt(m.depois)} for a, m in plano.limpezas])),
+            ("Vínculos", pd.DataFrame([{"Cadastro (ID)": p.cadastro_id, "Nome": p.nome, "Vínculo atual": p.de,
+                                        "Novo vínculo": p.para} for p in plano.propagacoes])),
+            ("Duplicados", pd.DataFrame([{"Tabela": nomes[o.tabela], "Linha": o.linha, "Motivo": o.motivo}
+                                         for o in plano.duplicados])),
+            ("Sem gravação", pd.DataFrame([{"Tabela": nomes[o.tabela], "Linha": o.linha, "ID": o.id or "",
+                                            "Situação": o.motivo}
+                                           for o in plano.sem_mudanca + plano.ja_aplicadas + plano.mantidas])),
+        ]
+        for titulo, df in tabelas:
+            if df.empty:
+                continue
+            w = QWidget()
+            lw = QVBoxLayout(w)
+            lw.addWidget(PaginatedTableWidget(df, linhas_por_pagina=12, status_cols=()))
+            abas.addTab(w, f"{titulo} ({len(df)})")
+        if abas.count():
+            lay.addWidget(abas, stretch=1)
+        else:
+            lay.addStretch(1)
+
+        barra = QHBoxLayout()
+        barra.addStretch(1)
+        btn_cancelar = QPushButton("Cancelar")
+        btn_cancelar.clicked.connect(dlg.reject)
+        btn_ok = QPushButton("Confirmar importação")
+        btn_ok.setObjectName("PrimaryBtn")
+        btn_ok.setEnabled(plano.pode_confirmar)
+        btn_ok.clicked.connect(dlg.accept)
+        barra.addWidget(btn_cancelar)
+        barra.addWidget(btn_ok)
+        lay.addLayout(barra)
+        dlg.botao_confirmar = btn_ok  # usado nos testes
+        return dlg
 
 
 def main():
