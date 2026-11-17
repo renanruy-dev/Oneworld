@@ -64,10 +64,9 @@ def confirmar_sempre(janela, resposta=True):
 
 
 def planilha_editada(janela, tmp_path, monkeypatch):
-    janela._estado_planilha()["tipo"] = pp.TIPO_EDICAO
     confirmar_sempre(janela)
     salvar_em(monkeypatch, tmp_path / "edicao")
-    janela._exportar_planilha_padrao()
+    janela._exportar_planilha_padrao(pp.TIPO_EDICAO)
     p = tmp_path / "edicao.xlsx"
     wb = load_workbook(p)
     ws = wb["Operacoes"]
@@ -80,25 +79,65 @@ def planilha_editada(janela, tmp_path, monkeypatch):
     return p
 
 
-def test_secao_tem_os_controles(janela):
-    textos = {b.text() for b in janela.findChildren(QPushButton)}
-    assert {"Exportar planilha...", "Baixar modelo vazio...", "Copiar prompt de análise",
-            "Copiar prompt de preenchimento", "Importar planilha preenchida...", "Baixar Markdown"} <= textos
+def _aba_ia(janela, titulo):
+    from PyQt6.QtWidgets import QTabWidget
+    abas = next(a for a in janela.findChildren(QTabWidget) if a.count() == 4)
+    i = next(i for i in range(abas.count()) if abas.tabText(i) == titulo)
+    return abas, abas.widget(i)
+
+
+def test_pagina_organizada_em_abas(janela):
+    from PyQt6.QtWidgets import QTabWidget
+    abas = next(a for a in janela.findChildren(QTabWidget) if a.count() == 4)
+    assert [abas.tabText(i) for i in range(4)] == [
+        "Perguntar aos dados", "Atualizar dados com IA externa", "Pedir análise à IA externa", "Exportar Markdown"]
+    assert "Baixar Markdown" in {b.text() for b in abas.widget(3).findChildren(QPushButton)}
+    assert "Perguntar" in {b.text() for b in abas.widget(0).findChildren(QPushButton)}
+
+
+def test_aba_atualizar_tem_passo_a_passo_e_botoes(janela):
+    from PyQt6.QtWidgets import QLabel
+    _, aba = _aba_ia(janela, "Atualizar dados com IA externa")
+    textos = " ".join(lbl.text() for lbl in aba.findChildren(QLabel))
+    for trecho in ("Escolha o que vai na planilha", "Baixe a planilha para edição", "Copie o prompt de preenchimento",
+                   "Envie à IA e baixe o arquivo devolvido", "Importe o arquivo devolvido", ".xlsx", "download"):
+        assert trecho in textos, trecho
+    botoes = [b.text() for b in aba.findChildren(QPushButton)]
+    assert botoes == ["Exportar planilha para edição...", "Baixar modelo vazio...", "Copiar prompt de preenchimento",
+                      "Importar planilha preenchida..."]
+
+
+def test_aba_analise_tem_passos_e_botoes(janela):
+    _, aba = _aba_ia(janela, "Pedir análise à IA externa")
+    assert [b.text() for b in aba.findChildren(QPushButton)] == [
+        "Exportar planilha para análise...", "Copiar prompt de análise"]
+
+
+def test_aba_continua_selecionada_apos_acao(janela):
+    abas, _ = _aba_ia(janela, "Atualizar dados com IA externa")
+    abas.setCurrentIndex(1)
+    janela._copiar_prompt_preenchimento()  # copia, mostra aviso e reconstrói a página
+    abas2, _ = _aba_ia(janela, "Atualizar dados com IA externa")
+    assert abas2.currentIndex() == 1
+
+
+def test_selecao_de_tabelas_independente_por_aba(janela):
+    janela._estado_planilha(pp.TIPO_EDICAO)["tabelas"] = ["eventos"]
+    assert janela._estado_planilha(pp.TIPO_ANALISE)["tabelas"] == ["eventos", "convidados"]
 
 
 def test_exportar_para_analise_sem_confirmacao(janela, tmp_path, monkeypatch):
     salvar_em(monkeypatch, tmp_path / "analise")
-    janela._exportar_planilha_padrao()
+    janela._exportar_planilha_padrao(pp.TIPO_ANALISE)
     assert (tmp_path / "analise.xlsx").is_file() and janela.confirmacoes == []
     with pytest.raises(pp.PlanilhaInvalida):
         pp.ler_planilha_padrao(tmp_path / "analise.xlsx")
 
 
 def test_exportar_para_edicao_pede_confirmacao_e_cancelar_nao_gera_arquivo(janela, tmp_path, monkeypatch):
-    janela._estado_planilha()["tipo"] = pp.TIPO_EDICAO
     confirmar_sempre(janela, False)
     salvar_em(monkeypatch, tmp_path / "edicao.xlsx")
-    janela._exportar_planilha_padrao()
+    janela._exportar_planilha_padrao(pp.TIPO_EDICAO)
     assert janela.confirmacoes == ["Exportar planilha para edição"]
     assert not (tmp_path / "edicao.xlsx").exists()
 
@@ -111,7 +150,8 @@ def test_modelo_vazio(janela, tmp_path, monkeypatch):
 
 
 def test_copiar_prompts_conforme_tabelas(janela):
-    janela._estado_planilha()["tabelas"] = ["eventos"]
+    janela._estado_planilha(pp.TIPO_ANALISE)["tabelas"] = ["eventos"]
+    janela._estado_planilha(pp.TIPO_EDICAO)["tabelas"] = ["eventos"]
     janela._copiar_prompt_analise()
     texto = QApplication.clipboard().text()
     assert "Operacoes" in texto and "Cadastros" not in texto
@@ -143,7 +183,7 @@ def test_confirmar_grava_e_informa(janela, tmp_path, monkeypatch):
 
 def test_arquivo_invalido_mostra_problemas(janela, tmp_path, monkeypatch):
     salvar_em(monkeypatch, tmp_path / "analise.xlsx")
-    janela._exportar_planilha_padrao()
+    janela._exportar_planilha_padrao(pp.TIPO_ANALISE)
     abrir(monkeypatch, tmp_path / "analise.xlsx")
     janela._importar_planilha_padrao()
     assert janela.mensagens[-1][1] == "Planilha não pode ser importada"

@@ -1590,7 +1590,27 @@ class OneWorldWindow(QMainWindow):
 
     # ── PÁGINA 5: ORIENTAÇÃO IA ──
     def pagina_ia(self):
-        self._cabecalho("Orientação IA", "Perguntas e análises baseadas nos dados")
+        self._cabecalho("Orientação IA", "Perguntas, análises e troca de dados com IA externa")
+        abas = QTabWidget()
+        construtores = [
+            ("Perguntar aos dados", self._aba_ia_perguntar),
+            ("Atualizar dados com IA externa", self._aba_ia_atualizar),
+            ("Pedir análise à IA externa", self._aba_ia_analise),
+            ("Exportar Markdown", self._aba_ia_markdown),
+        ]
+        for titulo, construir in construtores:
+            w = QWidget()
+            lay = QVBoxLayout(w)
+            lay.setContentsMargins(18, 18, 18, 18)
+            lay.setSpacing(14)
+            construir(lay)
+            lay.addStretch(1)
+            abas.addTab(w, titulo)
+        abas.setCurrentIndex(self.estado.get("tab_ia", 0))
+        abas.currentChanged.connect(lambda idx: self.estado.__setitem__("tab_ia", idx))
+        self.lay_pagina.addWidget(abas)
+
+    def _aba_ia_perguntar(self, lay: QVBoxLayout):
         st_llm = ia.llm_status()
         aviso_ia = (
             f"IA externa (BYOK) ativa: {st_llm['modelo']}. Ela orienta e sugere, sem alterar registros."
@@ -1598,23 +1618,23 @@ class OneWorldWindow(QMainWindow):
             else f"Resposta por regras locais ({st_llm.get('motivo', 'LLM não configurado')}). "
             "Configure a chave em .env para usar IA externa (BYOK); ela orienta e sugere, sem alterar registros."
         )
-        self.lay_pagina.addWidget(AlertBox(aviso_ia, "info"))
+        lay.addWidget(AlertBox(aviso_ia, "info"))
 
-        self.lay_pagina.addWidget(QLabel("Pergunte sobre seus dados"))
+        lay.addWidget(self._subtitulo("Pergunte sobre seus dados"))
         ed_perg = QPlainTextEdit()
         ed_perg.setPlaceholderText("Ex.: Qual é o valor/receita previsto por mês?")
         ed_perg.setMaximumHeight(95)
-        self.lay_pagina.addWidget(ed_perg)
+        lay.addWidget(ed_perg)
 
         btn_perg = QPushButton("Perguntar")
         btn_perg.setObjectName("PrimaryBtn")
         btn_perg.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.lay_pagina.addWidget(btn_perg, alignment=Qt.AlignmentFlag.AlignLeft)
+        lay.addWidget(btn_perg, alignment=Qt.AlignmentFlag.AlignLeft)
 
         ult_resp = self.estado.get("ia_ultima_resposta")
         if ult_resp:
-            self.lay_pagina.addWidget(self._subtitulo("Resposta"))
-            self.lay_pagina.addWidget(AlertBox(ult_resp, "info"))
+            lay.addWidget(self._subtitulo("Resposta"))
+            lay.addWidget(AlertBox(ult_resp, "info"))
 
         def fazer_pergunta():
             p = ed_perg.toPlainText().strip()
@@ -1628,29 +1648,28 @@ class OneWorldWindow(QMainWindow):
 
         btn_perg.clicked.connect(fazer_pergunta)
 
-        self.lay_pagina.addWidget(self._subtitulo("Relatórios recentes"))
+        lay.addWidget(self._subtitulo("Relatórios recentes"))
         rels = db.listar_relatorios()
         if rels.empty:
             cap_v = QLabel("Nenhuma pergunta registrada ainda.")
             cap_v.setObjectName("Caption")
-            self.lay_pagina.addWidget(cap_v)
+            lay.addWidget(cap_v)
         else:
             for r in rels.itertuples():
                 exp = ExpanderWidget(f"{r.data} — {r.pergunta}")
                 lbl_r = QLabel(str(r.resposta))
                 lbl_r.setWordWrap(True)
                 exp.corpo_layout.addWidget(lbl_r)
-                self.lay_pagina.addWidget(exp)
+                lay.addWidget(exp)
 
-        self.lay_pagina.addWidget(Divider())
-        self.lay_pagina.addWidget(self._subtitulo("Exportar para análise externa"))
+    def _aba_ia_markdown(self, lay: QVBoxLayout):
         cap_ex = QLabel(
             "Gera um Markdown com resumo, tabelas e um prompt sugerido para colar em um chat de IA externo. "
             "Ao colar, os dados saem do seu computador."
         )
         cap_ex.setObjectName("Caption")
         cap_ex.setWordWrap(True)
-        self.lay_pagina.addWidget(cap_ex)
+        lay.addWidget(cap_ex)
 
         md = bk.gerar_markdown(self.dados("eventos"), self.dados("convidados"), self.cfg)
         btn_md = QPushButton("Baixar Markdown")
@@ -1669,7 +1688,7 @@ class OneWorldWindow(QMainWindow):
                 self.reconstruir_pagina()
 
         btn_md.clicked.connect(salvar_md)
-        self.lay_pagina.addWidget(btn_md, alignment=Qt.AlignmentFlag.AlignLeft)
+        lay.addWidget(btn_md, alignment=Qt.AlignmentFlag.AlignLeft)
 
         exp_prev = ExpanderWidget("Pré-visualizar")
         ed_code = QPlainTextEdit(md)
@@ -1677,9 +1696,7 @@ class OneWorldWindow(QMainWindow):
         ed_code.setMinimumHeight(220)
         ed_code.setFont(QFont("Consolas", 10))
         exp_prev.corpo_layout.addWidget(ed_code)
-        self.lay_pagina.addWidget(exp_prev)
-
-        self._secao_planilha_padrao()
+        lay.addWidget(exp_prev)
 
     # ── PÁGINA 6: ANOTAÇÕES ──
     def pagina_anotacoes(self):
@@ -2515,50 +2532,88 @@ class OneWorldWindow(QMainWindow):
 
     # ── Planilha padrão e IA externa (fluxo manual, sem chamadas de IA) ──
     # Diálogos modais passam por _confirmar, _mostrar_mensagem e _revisar_importacao_planilha (testáveis).
-    def _estado_planilha(self) -> dict:
-        return self.estado.setdefault("planilha_padrao", {
-            "tabelas": ["eventos", "convidados"], "tipo": pp.TIPO_ANALISE, "periodo": False,
-            "ini": None, "fim": None, "pessoais": False,
+    def _estado_planilha(self, tipo: str) -> dict:
+        """Escolhas da aba (tabelas, período, dados pessoais). Cada aba — edição ou análise — tem as suas."""
+        return self.estado.setdefault(f"planilha_{tipo}", {
+            "tabelas": ["eventos", "convidados"], "periodo": False, "ini": None, "fim": None, "pessoais": False,
         })
 
-    def _opcoes_planilha(self, vazio: bool = False) -> pp.OpcoesExportacao:
-        st = self._estado_planilha()
+    def _opcoes_planilha(self, tipo: str, vazio: bool = False) -> pp.OpcoesExportacao:
+        st = self._estado_planilha(tipo)
         ini = fim = None
-        if st["periodo"]:
+        if st["periodo"] and not vazio:
             ini = st["ini"] or date.today().replace(day=1)
             fim = st["fim"] or date.today()
         return pp.OpcoesExportacao(
-            tipo=pp.TIPO_EDICAO if vazio else st["tipo"],
+            tipo=tipo,
             tabelas=tuple(t for t in pp.TABELAS if t in st["tabelas"]),
-            data_inicio=None if vazio else ini, data_fim=None if vazio else fim,
-            incluir_dados_pessoais=bool(st["pessoais"]), vazio=vazio,
+            data_inicio=ini, data_fim=fim,
+            incluir_dados_pessoais=bool(st["pessoais"]) and tipo == pp.TIPO_ANALISE, vazio=vazio,
         )
 
     def _nomes_tabelas_planilha(self) -> dict[str, str]:
         v = self.vocab()
         return {"eventos": v["ent1_plural"], "convidados": v["ent2_plural"], "anotacoes": "Anotações"}
 
-    def _secao_planilha_padrao(self):
-        st = self._estado_planilha()
-        nomes = self._nomes_tabelas_planilha()
-        lay = self.lay_pagina
-        lay.addWidget(Divider())
-        lay.addWidget(self._subtitulo("Planilha padrão e IA externa"))
-        cap = QLabel(
-            "Exporte seus dados em uma planilha XLSX padrão, copie um prompt e leve os dois, você mesmo, a um chat "
-            "de IA externo (ChatGPT, Gemini, Claude...). O OneWorld não envia nada automaticamente e não usa chave "
-            "de API aqui. Uma planilha preenchida pode voltar ao sistema com prévia e confirmação."
-        )
-        cap.setObjectName("Caption")
-        cap.setWordWrap(True)
-        lay.addWidget(cap)
-        lay.addWidget(AlertBox(
-            "Ao enviar a planilha a uma IA externa, os dados saem do seu computador. Textos livres e campos "
-            "personalizados podem conter informações pessoais; revise antes de enviar.", "warning"))
+    def _passo(self, lay: QVBoxLayout, numero: int, titulo: str, texto: str = "") -> QVBoxLayout:
+        """Cartão numerado de um passo; devolve o layout interno para receber botões e opções."""
+        card = QFrame()
+        card.setObjectName("OwCard")
+        corpo = QVBoxLayout(card)
+        corpo.setContentsMargins(18, 14, 18, 16)
+        corpo.setSpacing(10)
+        topo = QHBoxLayout()
+        topo.setSpacing(12)
+        selo = QLabel(str(numero))
+        selo.setFixedSize(30, 30)
+        selo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        selo.setStyleSheet(f"background:{self.cfg['cor']}; color:#FFFFFF; border-radius:15px; font-weight:800;")
+        lbl = QLabel(titulo)
+        lbl.setObjectName("SectionTitle")
+        topo.addWidget(selo)
+        topo.addWidget(lbl, stretch=1)
+        corpo.addLayout(topo)
+        if texto:
+            t = QLabel(texto)
+            t.setObjectName("PassoTexto")
+            t.setWordWrap(True)
+            t.setTextFormat(Qt.TextFormat.RichText)
+            corpo.addWidget(t)
+        lay.addWidget(card)
+        return corpo
 
-        # Tabelas
-        linha_tab = QHBoxLayout()
-        linha_tab.addWidget(QLabel("<b>Tabelas:</b>"))
+    @staticmethod
+    def _legenda(texto: str) -> QLabel:
+        lbl = QLabel(texto)
+        lbl.setObjectName("Caption")
+        lbl.setWordWrap(True)
+        return lbl
+
+    def _linha_botoes(self, lay: QVBoxLayout, botoes: list[tuple[str, object, bool]]):
+        linha = QHBoxLayout()
+        linha.setSpacing(10)
+        for rotulo, acao, primario in botoes:
+            b = QPushButton(rotulo)
+            if primario:
+                b.setObjectName("PrimaryBtn")
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.clicked.connect(lambda *_, a=acao: a())
+            linha.addWidget(b)
+        linha.addStretch(1)
+        lay.addLayout(linha)
+
+    def _opcoes_dados_planilha(self, lay: QVBoxLayout, tipo: str):
+        """Tabelas e período (cada aba guarda a própria escolha)."""
+        st = self._estado_planilha(tipo)
+        nomes = self._nomes_tabelas_planilha()
+        form = QFormLayout()
+        form.setHorizontalSpacing(16)
+        form.setVerticalSpacing(10)
+
+        w_tab = QWidget()
+        h_tab = QHBoxLayout(w_tab)
+        h_tab.setContentsMargins(0, 0, 0, 0)
+        h_tab.setSpacing(18)
         for tab in pp.TABELAS:
             chk = QCheckBox(nomes[tab].replace("&", "&&"))
             chk.setChecked(tab in st["tabelas"])
@@ -2570,23 +2625,29 @@ class OneWorldWindow(QMainWindow):
                     st["tabelas"].remove(t)
 
             chk.toggled.connect(alternar)
-            linha_tab.addWidget(chk)
-        linha_tab.addStretch(1)
-        lay.addLayout(linha_tab)
+            h_tab.addWidget(chk)
+        h_tab.addStretch(1)
+        form.addRow("Tabelas:", w_tab)
 
-        # Período
-        linha_per = QHBoxLayout()
-        chk_per = QCheckBox("Filtrar por período:")
+        w_per = QWidget()
+        h_per = QHBoxLayout(w_per)
+        h_per.setContentsMargins(0, 0, 0, 0)
+        h_per.setSpacing(10)
+        chk_per = QCheckBox("Somente de")
         chk_per.setChecked(bool(st["periodo"]))
         hoje = date.today()
         ini = st["ini"] or hoje.replace(day=1)
         fim = st["fim"] or hoje
         de_ini = QDateEdit(QDate(ini.year, ini.month, ini.day))
         de_fim = QDateEdit(QDate(fim.year, fim.month, fim.day))
+        pal = paleta_atual(self.cfg)
         for de in (de_ini, de_fim):
             de.setCalendarPopup(True)
             de.setDisplayFormat("dd/MM/yyyy")
+            de.setMinimumWidth(150)
             de.setEnabled(bool(st["periodo"]))
+            # fica visivelmente apagado enquanto o período não está marcado
+            de.setStyleSheet(f"QDateEdit:disabled {{ color: {pal['muted']}; background-color: {pal['bg']}; }}")
 
         def alternar_periodo(marcado):
             st["periodo"] = marcado
@@ -2596,89 +2657,88 @@ class OneWorldWindow(QMainWindow):
         chk_per.toggled.connect(alternar_periodo)
         de_ini.dateChanged.connect(lambda q: st.__setitem__("ini", date(q.year(), q.month(), q.day())))
         de_fim.dateChanged.connect(lambda q: st.__setitem__("fim", date(q.year(), q.month(), q.day())))
-        linha_per.addWidget(chk_per)
-        linha_per.addWidget(QLabel("de"))
-        linha_per.addWidget(de_ini)
-        linha_per.addWidget(QLabel("até"))
-        linha_per.addWidget(de_fim)
-        linha_per.addStretch(1)
-        lay.addLayout(linha_per)
-        cap_per = QLabel(
-            f"O período usa a data de {nomes['eventos']} e de Anotações. {nomes['convidados']} não têm data própria: "
-            f"entram quando a operação vinculada (mesmo texto) está no período. Se houver operações com o mesmo "
-            "nome dentro e fora do período, esses cadastros ficam de fora por vínculo ambíguo (o arquivo informa "
-            "quantos)."
-        )
-        cap_per.setObjectName("Caption")
-        cap_per.setWordWrap(True)
-        lay.addWidget(cap_per)
+        h_per.addWidget(chk_per)
+        h_per.addWidget(de_ini)
+        h_per.addWidget(QLabel("até"))
+        h_per.addWidget(de_fim)
+        h_per.addStretch(1)
+        form.addRow("Período:", w_per)
+        lay.addLayout(form)
+        lay.addWidget(self._legenda(
+            f"Sem marcar o período, vão todos os registros. {nomes['convidados']} não têm data própria: entram "
+            f"quando a operação vinculada está no período. Se houver operações com o mesmo nome dentro e fora "
+            "do período, esses cadastros ficam de fora e o arquivo informa quantos."
+        ))
 
-        # Tipo de exportação
-        linha_tipo = QHBoxLayout()
-        linha_tipo.addWidget(QLabel("<b>Exportar:</b>"))
-        grp = QButtonGroup(self.page_container)
-        rb_an = QRadioButton("Para análise (sem reimportação)")
-        rb_ed = QRadioButton("Para edição e reimportação")
-        grp.addButton(rb_an)
-        grp.addButton(rb_ed)
-        rb_an.setChecked(st["tipo"] == pp.TIPO_ANALISE)
-        rb_ed.setChecked(st["tipo"] == pp.TIPO_EDICAO)
+    def _aba_ia_atualizar(self, lay: QVBoxLayout):
+        lay.addWidget(self._legenda(
+            "Use quando quiser que uma IA externa (ChatGPT, Gemini, Claude...) inclua ou atualize registros por "
+            "você. O OneWorld não envia nada sozinho: você leva a planilha e o prompt ao chat e depois importa o "
+            "arquivo que a IA devolver."
+        ))
+        lay.addWidget(AlertBox(
+            "Esta planilha leva todos os campos, inclusive nomes, contatos e observações. Ao enviá-la a uma IA "
+            "externa, esses dados saem do seu computador.", "warning"))
+
+        p1 = self._passo(lay, 1, "Escolha o que vai na planilha")
+        self._opcoes_dados_planilha(p1, pp.TIPO_EDICAO)
+
+        p2 = self._passo(lay, 2, "Baixe a planilha para edição",
+                         "Gera o arquivo <b>.xlsx</b> com seus registros e os controles que permitem importar de "
+                         "volta com segurança.")
+        self._linha_botoes(p2, [
+            ("Exportar planilha para edição...", lambda: self._exportar_planilha_padrao(pp.TIPO_EDICAO), True),
+            ("Baixar modelo vazio...", self._exportar_modelo_vazio, False),
+        ])
+        p2.addWidget(self._legenda("Ainda não tem registros? Use o modelo vazio: mesma estrutura, sem dados."))
+
+        p3 = self._passo(lay, 3, "Copie o prompt de preenchimento",
+                         "O prompt explica à IA como preencher a planilha sem quebrar a estrutura e pede o arquivo "
+                         "<b>.xlsx para download</b>.")
+        self._linha_botoes(p3, [("Copiar prompt de preenchimento", self._copiar_prompt_preenchimento, False)])
+
+        self._passo(lay, 4, "Envie à IA e baixe o arquivo devolvido",
+                    "Em um chat de IA que aceite anexos e gere arquivos: <b>anexe a planilha</b>, <b>cole o "
+                    "prompt</b> e troque o texto entre &lt;novos_dados&gt; pelos dados novos ou pelas alterações "
+                    "que você quer. Depois, <b>baixe o .xlsx</b> que a IA devolver. Se ela mostrar só uma tabela "
+                    "no chat, peça o arquivo para download.")
+
+        p5 = self._passo(lay, 5, "Importe o arquivo devolvido",
+                         "Você verá uma prévia com o que será incluído, alterado ou limpo. Nada é gravado sem a sua "
+                         "confirmação, e o sistema faz uma cópia de segurança antes.")
+        self._linha_botoes(p5, [("Importar planilha preenchida...", self._importar_planilha_padrao, True)])
+
+    def _aba_ia_analise(self, lay: QVBoxLayout):
+        lay.addWidget(self._legenda(
+            "Use quando quiser que uma IA externa analise seus dados e sugira caminhos para o negócio. Este arquivo "
+            "é só para leitura: não pode ser importado de volta."
+        ))
+        st = self._estado_planilha(pp.TIPO_ANALISE)
+
+        p1 = self._passo(lay, 1, "Escolha o que vai na planilha")
+        self._opcoes_dados_planilha(p1, pp.TIPO_ANALISE)
         chk_pes = QCheckBox("Incluir nomes, contatos, observações e campos personalizados")
         chk_pes.setChecked(bool(st["pessoais"]))
-        chk_pes.setEnabled(st["tipo"] == pp.TIPO_ANALISE)
         chk_pes.toggled.connect(lambda m: st.__setitem__("pessoais", m))
+        p1.addWidget(chk_pes)
+        p1.addWidget(self._legenda(
+            "Desmarcado, o arquivo sai sem essas colunas. Ainda assim, textos livres (como o nome da operação) podem "
+            "conter informações pessoais: revise antes de enviar."
+        ))
 
-        def mudar_tipo(marcado):
-            st["tipo"] = pp.TIPO_ANALISE if marcado else pp.TIPO_EDICAO
-            chk_pes.setEnabled(marcado)
+        p2 = self._passo(lay, 2, "Baixe a planilha para análise",
+                         "Gera o arquivo <b>.xlsx</b> com um resumo por mês e os dados escolhidos.")
+        self._linha_botoes(p2, [
+            ("Exportar planilha para análise...", lambda: self._exportar_planilha_padrao(pp.TIPO_ANALISE), True),
+        ])
 
-        rb_an.toggled.connect(mudar_tipo)
-        linha_tipo.addWidget(rb_an)
-        linha_tipo.addWidget(rb_ed)
-        linha_tipo.addStretch(1)
-        lay.addLayout(linha_tipo)
-        lay.addWidget(chk_pes)
-        cap_tipo = QLabel(
-            "Para análise: resumo e dados sem nomes, contatos, observações e campos personalizados (salvo se marcado "
-            "acima), sem identificadores do sistema; não pode ser importado de volta. Para edição: todos os campos, "
-            "com identificadores e controles que permitem reimportar com segurança."
-        )
-        cap_tipo.setObjectName("Caption")
-        cap_tipo.setWordWrap(True)
-        lay.addWidget(cap_tipo)
+        p3 = self._passo(lay, 3, "Copie o prompt e envie à IA",
+                         "Anexe a planilha no chat e cole o prompt. Ele pede sugestões baseadas nos dados, lembra que "
+                         "o valor é <b>previsto</b> e proíbe inventar números. A IA sugere; quem decide é você.")
+        self._linha_botoes(p3, [("Copiar prompt de análise", self._copiar_prompt_analise, False)])
 
-        linha_btn = QHBoxLayout()
-        botoes = [
-            ("Exportar planilha...", self._exportar_planilha_padrao, True),
-            ("Baixar modelo vazio...", self._exportar_modelo_vazio, False),
-            ("Copiar prompt de análise", self._copiar_prompt_analise, False),
-            ("Copiar prompt de preenchimento", self._copiar_prompt_preenchimento, False),
-        ]
-        for rotulo, acao, primario in botoes:
-            b = QPushButton(rotulo)
-            if primario:
-                b.setObjectName("PrimaryBtn")
-            b.setCursor(Qt.CursorShape.PointingHandCursor)
-            b.clicked.connect(acao)
-            linha_btn.addWidget(b)
-        linha_btn.addStretch(1)
-        lay.addLayout(linha_btn)
-
-        linha_imp = QHBoxLayout()
-        btn_imp = QPushButton("Importar planilha preenchida...")
-        btn_imp.setObjectName("PrimaryBtn")
-        btn_imp.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_imp.clicked.connect(self._importar_planilha_padrao)
-        linha_imp.addWidget(btn_imp)
-        cap_imp = QLabel("Somente planilhas exportadas para edição ou o modelo vazio. Nada é gravado sem a sua "
-                         "confirmação após a prévia.")
-        cap_imp.setObjectName("Caption")
-        cap_imp.setWordWrap(True)
-        linha_imp.addWidget(cap_imp, stretch=1)
-        lay.addLayout(linha_imp)
-
-    def _abas_selecionadas(self) -> list[str]:
-        return [pp.ABA_DA_TABELA[t] for t in pp.TABELAS if t in self._estado_planilha()["tabelas"]]
+    def _abas_selecionadas(self, tipo: str) -> list[str]:
+        return [pp.ABA_DA_TABELA[t] for t in pp.TABELAS if t in self._estado_planilha(tipo)["tabelas"]]
 
     def _salvar_xlsx_dialogo(self, titulo: str, nome: str) -> Path | None:
         pasta = BACKUP_DIR if BACKUP_DIR.is_dir() else Path.home()
@@ -2688,8 +2748,8 @@ class OneWorldWindow(QMainWindow):
         destino = Path(caminho)
         return destino if destino.suffix.lower() == ".xlsx" else destino.with_name(destino.name + ".xlsx")
 
-    def _exportar_planilha_padrao(self, _=None, vazio: bool = False):
-        opcoes = self._opcoes_planilha(vazio=vazio)
+    def _exportar_planilha_padrao(self, tipo: str, vazio: bool = False):
+        opcoes = self._opcoes_planilha(tipo, vazio=vazio)
         nomes = self._nomes_tabelas_planilha()
         if not opcoes.tabelas:
             self._mostrar_mensagem("aviso", "Planilha padrão", "Marque ao menos uma tabela para exportar.")
@@ -2734,7 +2794,7 @@ class OneWorldWindow(QMainWindow):
         self.reconstruir_pagina()
 
     def _exportar_modelo_vazio(self):
-        self._exportar_planilha_padrao(vazio=True)
+        self._exportar_planilha_padrao(pp.TIPO_EDICAO, vazio=True)
 
     def _copiar_texto(self, texto: str, aviso: str):
         QApplication.clipboard().setText(texto)
@@ -2742,21 +2802,21 @@ class OneWorldWindow(QMainWindow):
         self.reconstruir_pagina()
 
     def _copiar_prompt_analise(self):
-        abas = self._abas_selecionadas()
+        abas = self._abas_selecionadas(pp.TIPO_ANALISE)
         if not abas:
-            self._mostrar_mensagem("aviso", "Planilha padrão", "Marque ao menos uma tabela.")
+            self._mostrar_mensagem("aviso", "Planilha padrão", "Marque ao menos uma tabela no passo 1.")
             return
         self._copiar_texto(pp.prompt_analise(abas),
                            f"Prompt de análise copiado (abas: {', '.join(abas)}). Cole no chat junto com a planilha.")
 
     def _copiar_prompt_preenchimento(self):
-        abas = self._abas_selecionadas()
+        abas = self._abas_selecionadas(pp.TIPO_EDICAO)
         if not abas:
-            self._mostrar_mensagem("aviso", "Planilha padrão", "Marque ao menos uma tabela.")
+            self._mostrar_mensagem("aviso", "Planilha padrão", "Marque ao menos uma tabela no passo 1.")
             return
         self._copiar_texto(pp.prompt_preenchimento(abas, self.campos_personalizados),
-                           f"Prompt de preenchimento copiado (abas: {', '.join(abas)}). Use-o com a planilha "
-                           "exportada para edição ou com o modelo vazio.")
+                           f"Prompt de preenchimento copiado (abas: {', '.join(abas)}). Cole no chat junto com a "
+                           "planilha exportada para edição (ou o modelo vazio).")
 
     def _importar_planilha_padrao(self):
         try:

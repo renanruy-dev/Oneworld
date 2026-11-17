@@ -205,6 +205,69 @@ def test_prompts_correspondem_as_abas_exportadas():
     assert "Recusou" in pf and "Em planejamento" not in pf
 
 
+def test_prompt_preenchimento_exige_arquivo_para_download():
+    pf = pp.prompt_preenchimento(["Operacoes", "Cadastros"], [])
+    obrigatorios = [
+        "ARQUIVO .xlsx",                                   # pede arquivo...
+        "PARA DOWNLOAD",                                   # ...para baixar
+        "Não responda apenas com uma tabela",              # não só tabela no chat
+        "não afirme que entregou um arquivo",              # se não conseguir, não finge
+        "não invente links",
+        "aba \"OneWorld\" (metadados)",                    # preserva metadados
+        "mesmas abas", "cabeçalho na linha 1",             # preserva abas e cabeçalhos
+        "Não altere as colunas \"id_oneworld\" e \"controle\" das linhas existentes",
+        "\"id_oneworld\" e \"controle\" VAZIOS",           # registros novos
+        "Só altere uma linha existente se eu pedir explicitamente",
+        "Use somente as informações que eu fornecer", "NÃO invente dados",
+        "<novos_dados>",
+    ]
+    faltando = [t for t in obrigatorios if t not in pf]
+    assert not faltando, faltando
+
+
+def test_fluxo_completo_simulando_ia_externa(tmp_path):
+    """SIMULAÇÃO (não é teste com IA real): a 'IA' é um script que edita o XLSX exportado com openpyxl,
+    como faria uma IA com execução de código: altera uma célula e acrescenta linhas no fim (ws.append)."""
+    popular()
+    # 1. exportar "para edição e reimportação"
+    res = pp.exportar_planilha(tmp_path / "oneworld_edicao.xlsx", pp.OpcoesExportacao(tipo=pp.TIPO_EDICAO))
+    # 2. prompt de preenchimento correspondente às abas exportadas
+    prompt = pp.prompt_preenchimento(res.abas, ["Fornecedor"])
+    assert "Operacoes, Cadastros" in prompt
+    # 3-4. "IA": edita o arquivo original e devolve outro arquivo .xlsx
+    wb = load_workbook(res.caminho)
+    ops, cads = wb["Operacoes"], wb["Cadastros"]
+    h_ops, h_cads = cab(ops), cab(cads)
+    ops.cell(row=linha_do_id(ops, 2), column=h_ops["valor"]).value = 150      # atualização pedida
+    ops.cell(row=linha_do_id(ops, 2), column=h_ops["status"]).value = "Confirmado"
+    nova_op = {"data": "2027-02-10", "cliente": "Casamento Lia", "local": "Sítio", "convidados": 120,
+               "valor": 18000, "status": "Confirmado", "campo:Fornecedor": "Buffet X"}
+    ops.append([nova_op.get(c) for c in h_ops])                                # inclusão (após as linhas formatadas)
+    novo_cad = {"evento": "Casamento Lia", "nome": "Lia", "mesa": "001", "acompanhantes": 1,
+                "contato": "021988887777", "confirmacao": "Confirmado"}
+    cads.append([novo_cad.get(c) for c in h_cads])
+    devolvido = tmp_path / "oneworld_edicao_preenchido.xlsx"
+    wb.save(devolvido)
+    # 5-6. importar: prévia e confirmação
+    arq = pp.ler_planilha_padrao(devolvido)
+    plano = pp.planejar_importacao(arq)
+    assert plano.pode_confirmar and not plano.erros and not plano.conflitos
+    assert len(plano.inclusoes) == 2 and len(plano.alteracoes) == 1 and len(plano.sem_mudanca) == 5
+    resultado = pp.aplicar_importacao(arq, plano)
+    assert resultado.inclusoes == {"eventos": 1, "convidados": 1} and resultado.alteracoes == {"eventos": 1}
+    ev = db.carregar("eventos", ["Fornecedor"]).set_index("id")
+    assert ev.loc[2, "valor"] == 150 and ev.loc[2, "status"] == "Confirmado"
+    assert ev.loc[4, "cliente"] == "Casamento Lia" and ev.loc[4, "Fornecedor"] == "Buffet X"
+    cv = db.carregar("convidados").set_index("nome").loc["Lia"]
+    assert cv["mesa"] == "001" and cv["contato"] == "021988887777" and cv["evento"] == "Casamento Lia"
+    # reimportar o mesmo arquivo devolvido: nada é duplicado nem reaplicado
+    antes = estado()
+    plano2 = pp.planejar_importacao(pp.ler_planilha_padrao(devolvido))
+    assert not plano2.tem_gravacao and not plano2.pode_confirmar
+    assert len(plano2.duplicados) == 2 and [o.id for o in plano2.ja_aplicadas] == [2]
+    assert estado() == antes
+
+
 # ── Reimportação: identidade, alterações e reimportação idempotente ──
 def test_reimportar_sem_mudancas_nao_grava_nada(tmp_path):
     popular()
