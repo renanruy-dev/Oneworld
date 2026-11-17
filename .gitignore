@@ -18,13 +18,13 @@ venv.bak/
 oneworld.db
 backups/
 
-# Streamlit and local secrets
+# Secrets e variaveis locais
 .streamlit/secrets.toml
 .env
 .env.*
 !.env.example
 
-# Logs and temporary files
+# Logs e arquivos temporarios
 *.log
 *.tmp
 *.temp
@@ -33,6 +33,13 @@ backups/
 .DS_Store
 Thumbs.db
 desktop.ini
+*.lnk
+
+# Documentos locais e temporários
+*.pdf
+*.docx
+~$*
+oneworld_modelo_base.py
 
 # Editors and IDEs
 .vscode/
@@ -41,3 +48,4 @@ desktop.ini
 *.sublime-workspace
 *.swp
 *.swo
+.pytest_cache/

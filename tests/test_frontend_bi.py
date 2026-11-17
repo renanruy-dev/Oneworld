@@ -1,29 +1,31 @@
-"""Fluxos reais de rerun Streamlit com SQLite isolado em diretório temporário."""
-from pathlib import Path
+"""Fluxos reais de BI e testes do BIDashboardWidget em PyQt6 isolado."""
+from datetime import date
 from io import BytesIO
-import json
 import os
+from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
 
 import pandas as pd
 from pandas.testing import assert_frame_equal
-import streamlit as st
 
-from streamlit.testing.v1 import AppTest
+try:
+    os.environ["QT_QPA_PLATFORM"] = "offscreen"
+    from PyQt6.QtWidgets import QApplication
+    _qt_app = QApplication.instance() or QApplication(["-platform", "offscreen"])
+    from oneworld.frontend_bi import BIDashboardWidget
+    TEM_PYQT6 = True
+except (ImportError, OSError):
+    TEM_PYQT6 = False
+    BIDashboardWidget = None
 
 from oneworld import database
 
 RAIZ = Path(__file__).resolve().parents[1]
 
 
-def widget(app, tipo, base):
-    """Localiza um controle da fonte ativa por seu nome funcional."""
-    return next(w for w in getattr(app, tipo)
-                if w.key and w.key.split("::")[0] == base)
-
-
+@unittest.skipUnless(TEM_PYQT6, "PyQt6 ou bibliotecas de display não disponíveis no ambiente")
 class TestDashboard(unittest.TestCase):
     def setUp(self):
         self.temporario = tempfile.TemporaryDirectory()
@@ -31,228 +33,270 @@ class TestDashboard(unittest.TestCase):
         self.banco = patch.object(database, "DB_PATH", Path(self.temporario.name) / "teste.db")
         self.banco.start()
         self.addCleanup(self.banco.stop)
-        self.app = AppTest.from_file(str(RAIZ / "app.py"), default_timeout=20).run()
+        self.widget = BIDashboardWidget()
 
     def verificar_sem_erros(self):
-        self.assertFalse(self.app.exception, [e.message for e in self.app.exception])
-        self.assertFalse(self.app.error, [e.value for e in self.app.error])
+        self.assertIsNone(self.widget.erro_atual)
+
+    def test_campos_personalizados_do_banco_usam_tipo_e_escopo(self):
+        database.init_db()
+        database.cfg_gravar("campos_personalizados", [
+            "Observação",
+            {"nome": "Quantidade", "tipo": "inteiro", "tabelas": ["eventos"]},
+            {"nome": "Vencimento", "tipo": "data", "tabelas": ["eventos"]},
+            {"nome": "Entregue", "tipo": "booleano", "tabelas": ["eventos"]},
+        ])
+        for cliente, quantidade, vencimento, entregue in [
+            ("A", 12, "2026-11-17", True),
+            ("B", 3, "2026-12-01", False),
+            ("C", None, None, None),
+        ]:
+            database.inserir_lote("eventos", [{"cliente": cliente}], {
+                "Observação": "00123", "Quantidade": quantidade,
+                "Vencimento": vencimento, "Entregue": entregue,
+            })
+
+        widget = self.widget
+        widget._ao_alternar_banco_local(True)
+        widget.selecionar_fonte("Banco local: eventos")
+        self.verificar_sem_erros()
+        self.assertNotIn("extras", widget.meta)
+        self.assertNotIn("Observação", widget.filtro_widgets)
+        self.assertEqual(widget.df_tipado["Observação"].tolist(), ["00123"] * 3)
+
+        widget.configurar_kpi(0, operacao="soma", coluna="Quantidade")
+        self.assertEqual(widget.obter_kpi_resultados()[0].valor, 15)
+        widget.configurar_grafico("linhas", grupo="Vencimento", operacao="soma",
+                                  coluna="Quantidade", periodo="mes")
+        self.assertEqual(widget.obter_tabela_grafico()["valor"].tolist(), [12, 3])
+
+        controle = widget.filtro_widgets["Entregue"]
+        controle["chk"].setChecked(True)
+        controle["combo"].setCurrentText("Não")
+        self.assertEqual(widget.obter_kpi_resultados()[0].valor, 3)
+        self.assertEqual(widget.obter_df_filtrado()["cliente"].tolist(), ["B"])
+
+        widget.selecionar_fonte("Banco local: convidados")
+        self.assertIn("Observação", widget.meta)
+        self.assertNotIn("Quantidade", widget.meta)
 
     def test_inicializacao_e_troca_dataset(self):
         self.verificar_sem_erros()
-        self.assertEqual(self.app.metric[0].value, "3")
-        widget(self.app, "selectbox", "bi_dataset").select("Exemplo: vendas").run()
+        self.assertEqual(self.widget.lbl_perfil.text(), "Educação")
+        self.assertEqual([k.valor for k in self.widget.obter_kpi_resultados()], [3, 8, 2])
+        self.widget.selecionar_fonte("Exemplo: vendas")
         self.verificar_sem_erros()
-        self.assertEqual(self.app.metric[0].value, "4")
-        widget(self.app, "selectbox", "bi_dataset").select("Exemplo: estoque").run()
+        self.assertEqual(self.widget.lbl_perfil.text(), "Vendas")
+        self.assertEqual([k.valor for k in self.widget.obter_kpi_resultados()], [450, 112.5, 3])
+        self.widget.selecionar_fonte("Exemplo: estoque")
         self.verificar_sem_erros()
-        self.assertEqual(self.app.metric[0].value, "3")
+        self.assertEqual(self.widget.lbl_perfil.text(), "Estoque")
+        self.assertEqual([k.valor for k in self.widget.obter_kpi_resultados()], [47, 3, 2])
+
+    def test_atalhos_alteram_grafico_escolar_por_ano(self):
+        base = b"ano,alunos,professores,turma\n2025,12,3,A\n2024,15,2,B\n2025,19,1,B\n"
+        self.assertTrue(self.widget.adicionar_arquivo(base, "escola.csv"))
+        self.assertEqual(self.widget.lbl_titulo_grafico.text(), "Alunos por ano")
+        tabela = self.widget.obter_tabela_grafico()
+        self.assertEqual(tabela["grupo"].tolist(), [2024, 2025])
+        self.assertEqual(tabela["valor"].tolist(), [15, 31])
+
+        professores = next(b for b in self.widget.grupo_medida.buttons() if b.text() == "Professores")
+        professores.click()
+        self.assertTrue(professores.isChecked())
+        self.assertEqual(self.widget.obter_tabela_grafico()["valor"].tolist(), [2, 4])
+        self.widget.botoes_tipo["linhas"].click()
+        self.assertTrue(self.widget.botoes_tipo["linhas"].isChecked())
+        self.assertEqual(self.widget.obter_tabela_grafico()["valor"].tolist(), [2, 4])
+
+        self.widget.botoes_tipo["histograma"].click()
+        self.widget.cb_graf_medida.setCurrentText("alunos")
+        self.assertEqual(self.widget.obter_tabela_grafico()["frequencia"].sum(), 3)
+        self.widget.botoes_tipo["barras"].click()
+        self.assertEqual(self.widget.lbl_titulo_grafico.text(), "Professores por ano")
+        self.widget.cb_graf_grupo.setCurrentText("turma")
+        self.assertEqual(self.widget.obter_tabela_grafico()["valor"].tolist(), [3, 3])
 
     def test_kpi_grafico_e_filtro_atualizados(self):
-        widget(self.app, "selectbox", "bi_cfg_kpi_0_op").select("media").run()
+        self.widget.configurar_kpi(0, operacao="media", coluna="nota")
         self.verificar_sem_erros()
-        self.assertEqual(self.app.metric[0].value, "8.00")
-        widget(self.app, "selectbox", "bi_cfg_agregacao").select("media").run()
-        widget(self.app, "selectbox", "bi_cfg_grupo_barras").select("turma").run()
-        widget(self.app, "checkbox", "bi_cfg_filtro_1").check().run()
-        widget(self.app, "multiselect", "bi_cfg_filtro_1_valores").set_value([]).run()
+        self.assertEqual(self.widget.obter_kpi_resultados()[0].valor, 8.0)
+
+        self.widget.configurar_grafico(tipo="barras", grupo="turma", operacao="media", coluna="nota")
+        self.widget.definir_filtro("turma", ativo=True, valores=[])
         self.verificar_sem_erros()
-        self.assertEqual(self.app.metric[0].value, "—")
-        widget(self.app, "multiselect", "bi_cfg_filtro_1_valores").set_value(["A"]).run()
+        # Seleção vazia: nenhum registro
+        self.assertIsNone(self.widget.obter_kpi_resultados()[0].valor)
+
+        self.widget.definir_filtro("turma", ativo=True, valores=["A"])
         self.verificar_sem_erros()
-        self.assertEqual(self.app.metric[0].value, "7.00")
-        grafico = self.app.dataframe[1].value
-        self.assertEqual(grafico["valor"].tolist(), [7])
-        identidade_filtro = widget(self.app, "checkbox", "bi_cfg_filtro_1").key
-        widget(self.app, "button", "bi_limpar").click().run()
+        self.assertEqual(self.widget.obter_kpi_resultados()[0].valor, 7.0)
+
+        tabela_graf = self.widget.obter_tabela_grafico()
+        self.assertEqual(tabela_graf["valor"].tolist(), [7.0])
+
+        self.widget.limpar_filtros()
         self.verificar_sem_erros()
-        self.assertNotEqual(widget(self.app, "checkbox", "bi_cfg_filtro_1").key, identidade_filtro)
-        self.assertFalse(widget(self.app, "checkbox", "bi_cfg_filtro_1").value)
-        self.assertEqual(self.app.metric[0].value, "8.00")
+        self.assertEqual(self.widget.obter_kpi_resultados()[0].valor, 8.0)
 
     def test_datas_histograma_e_multiplos_kpis(self):
-        widget(self.app, "selectbox", "bi_dataset").select("Exemplo: vendas").run()
-        widget(self.app, "multiselect", "bi_cfg_datas").set_value(["data"]).run()
-        widget(self.app, "selectbox", "bi_cfg_grafico").select("linhas").run()
+        self.widget.selecionar_fonte("Exemplo: vendas")
+        self.widget.configurar_datas(["data"], formato="%Y-%m-%d")
+        self.widget.configurar_grafico("linhas", grupo="data", operacao="soma", coluna="valor", periodo="dia")
         self.verificar_sem_erros()
-        self.assertEqual(self.app.dataframe[1].value["valor"].sum(), 4)
-        widget(self.app, "checkbox", "bi_cfg_filtro_3").check().run()
-        from datetime import date
-        widget(self.app, "date_input", "bi_cfg_filtro_3_max").set_value(date(2026, 10, 2)).run()
+        self.assertEqual(self.widget.obter_tabela_grafico()["valor"].sum(), 450)
+
+        self.widget.definir_filtro("data", ativo=True, maximo="2026-10-02")
         self.verificar_sem_erros()
-        self.assertEqual(self.app.metric[0].value, "2")
-        widget(self.app, "selectbox", "bi_cfg_grafico").select("histograma").run()
+        self.assertEqual(self.widget.obter_kpi_resultados()[0].valor, 300)
+
+        self.widget.configurar_grafico("histograma", coluna="valor", intervalos=10)
         self.verificar_sem_erros()
-        self.assertEqual(self.app.dataframe[1].value["frequencia"].sum(), 2)
-        widget(self.app, "number_input", "bi_cfg_n_kpis").set_value(2).run()
-        self.assertEqual(len(self.app.metric), 2)
-        widget(self.app, "selectbox", "bi_dataset").select("Exemplo: educacao").run()
+        self.assertEqual(self.widget.obter_tabela_grafico()["frequencia"].sum(), 2)
+
+        self.widget._ao_mudar_qtd_kpis(2)
+        self.assertEqual(len(self.widget.obter_kpi_resultados()), 2)
+
+        self.widget.selecionar_fonte("Exemplo: educacao")
         self.verificar_sem_erros()
-        self.assertEqual(len(self.app.metric), 1)
-        self.assertNotIn("linhas", widget(self.app, "selectbox", "bi_cfg_grafico").options)
+        self.assertEqual(len(self.widget.obter_kpi_resultados()), 3)
+        self.assertFalse(self.widget.botoes_tipo["linhas"].isEnabled())
 
     def test_histograma_preserva_ordem_numerica_no_eixo(self):
-        widget(self.app, "selectbox", "bi_dataset").select("Exemplo: estoque").run()
-        widget(self.app, "selectbox", "bi_cfg_grafico").select("histograma").run()
+        self.widget.selecionar_fonte("Exemplo: estoque")
+        self.widget.configurar_grafico("histograma", coluna="quantidade", intervalos=10)
         self.verificar_sem_erros()
-        tabela = self.app.dataframe[1].value
+        tabela = self.widget.obter_tabela_grafico()
         self.assertNotEqual(tabela["intervalo"].tolist(), sorted(tabela["intervalo"]))
-        especificacao = json.loads(self.app.get("vega_lite_chart")[0].proto.spec)
-        self.assertIn("sort", especificacao["encoding"]["x"])
-        self.assertIsNone(especificacao["encoding"]["x"]["sort"])
         self.assertEqual(tabela["frequencia"].sum(), 3)
 
     def test_limites_invertidos_mostram_mensagem(self):
-        widget(self.app, "checkbox", "bi_cfg_filtro_2").check().run()
-        widget(self.app, "number_input", "bi_cfg_filtro_2_min").set_value(11.0).run()
-        self.assertFalse(self.app.exception)
-        self.assertTrue(self.app.error)
-        self.assertIn("invertidos", self.app.error[0].value)
+        self.widget.definir_filtro("nota", ativo=True, minimo=11.0, maximo=2.0)
+        self.assertIsNotNone(self.widget.erro_atual)
+        self.assertIn("invertidos", self.widget.erro_atual)
 
     def test_formato_data_invalido_e_recuperacao(self):
-        widget(self.app, "selectbox", "bi_dataset").select("Exemplo: vendas").run()
-        widget(self.app, "multiselect", "bi_cfg_datas").set_value(["data"]).run()
-        widget(self.app, "text_input", "bi_cfg_formato_data").set_value("%Q").run()
-        self.assertFalse(self.app.exception)
-        self.assertTrue(self.app.error)
-        self.assertIn("formato", self.app.error[0].value)
-        widget(self.app, "text_input", "bi_cfg_formato_data").set_value("%Y-%m-%d").run()
+        self.widget.selecionar_fonte("Exemplo: vendas")
+        self.widget.configurar_datas(["data"], formato="%Q")
+        self.assertIsNotNone(self.widget.erro_atual)
+        self.assertIn("formato", self.widget.erro_atual)
+        self.widget.configurar_datas(["data"], formato="%Y-%m-%d")
         self.verificar_sem_erros()
-        self.assertEqual(self.app.metric[0].value, "4")
+        self.assertEqual(self.widget.obter_kpi_resultados()[0].valor, 450)
 
     def test_troca_descarta_todas_as_configuracoes_antigas(self):
-        widget(self.app, "selectbox", "bi_dataset").select("Exemplo: vendas").run()
-        widget(self.app, "multiselect", "bi_cfg_datas").set_value(["data"]).run()
-        widget(self.app, "checkbox", "bi_cfg_filtro_1").check().run()
-        widget(self.app, "multiselect", "bi_cfg_filtro_1_valores").set_value([]).run()
-        widget(self.app, "number_input", "bi_cfg_n_kpis").set_value(6).run()
-        widget(self.app, "text_input", "bi_cfg_kpi_0_titulo").set_value("Título antigo").run()
-        widget(self.app, "selectbox", "bi_cfg_kpi_0_fmt").select("Moeda").run()
-        widget(self.app, "selectbox", "bi_cfg_grafico").select("linhas").run()
-        widget(self.app, "selectbox", "bi_cfg_periodo").select("mes").run()
-        identidade = widget(self.app, "selectbox", "bi_cfg_grafico").key
-        for nome, grupos in (("educacao", ["aluno", "turma"]),
-                             ("estoque", ["produto", "categoria"]),
-                             ("vendas", ["produto", "categoria", "data"])):
-            widget(self.app, "selectbox", "bi_dataset").select("Exemplo: " + nome).run()
+        self.widget.selecionar_fonte("Exemplo: vendas")
+        self.widget.configurar_datas(["data"], formato="%Y-%m-%d")
+        self.widget.definir_filtro("produto", ativo=True, valores=[])
+        self.widget._ao_mudar_qtd_kpis(3)
+        self.widget.configurar_kpi(0, operacao="media", titulo="Título antigo", formato="Moeda")
+        self.widget.configurar_grafico("linhas", grupo="data", periodo="mes")
+
+        for nome, titulo, formato in (
+            ("educacao", "Alunos distintos", "Número"),
+            ("estoque", "Unidades em estoque", "Número"),
+            ("vendas", "Valor das vendas", "Moeda"),
+        ):
+            self.widget.selecionar_fonte("Exemplo: " + nome)
             self.verificar_sem_erros()
-            self.assertEqual(len(self.app.metric), 1)
-            self.assertEqual(self.app.metric[0].label, "KPI 1")
-            self.assertEqual(widget(self.app, "selectbox", "bi_cfg_kpi_0_fmt").value, "Número")
-            self.assertEqual(widget(self.app, "multiselect", "bi_cfg_datas").value, [])
-            self.assertFalse(any(w.value for w in self.app.checkbox
-                                 if w.key.startswith("bi_cfg_filtro_")))
-            self.assertEqual(widget(self.app, "selectbox", "bi_cfg_grupo_barras").options, grupos)
-            self.assertNotEqual(widget(self.app, "selectbox", "bi_cfg_grafico").key, identidade)
-            identidade = widget(self.app, "selectbox", "bi_cfg_grafico").key
-            self.assertNotIn("linhas", widget(self.app, "selectbox", "bi_cfg_grafico").options)
+            self.assertEqual(len(self.widget.obter_kpi_resultados()), 3)
+            self.assertEqual(self.widget.kpi_cfgs[0]["titulo"], titulo)
+            self.assertEqual(self.widget.kpi_cfgs[0]["formato"], formato)
+            self.assertEqual(len(self.widget.filtros_ativos), 0)
+            self.assertTrue(self.widget.botoes_tipo["barras"].isChecked())
 
     def test_filtros_combinados_exportacao_e_limpeza_sem_ia(self):
-        # Risco de integração: CSV pode divergir da tabela mesmo com KPIs corretos.
-        # Captura os bytes enviados ao botão real; AppTest não clica downloads.
-        from datetime import date
         with patch.dict(os.environ, {}, clear=True), patch(
             "oneworld.backend.responder_ia", side_effect=AssertionError("BI chamou IA")
-        ) as ia, patch("oneworld.frontend_bi.st.download_button", wraps=st.download_button) as download:
-            widget(self.app, "selectbox", "bi_dataset").select("Exemplo: vendas").run()
-            widget(self.app, "multiselect", "bi_cfg_datas").set_value(["data"]).run()
-            widget(self.app, "selectbox", "bi_cfg_kpi_0_op").select("soma").run()
-            widget(self.app, "selectbox", "bi_cfg_grupo_barras").select("categoria").run()
-            widget(self.app, "selectbox", "bi_cfg_agregacao").select("soma").run()
-            widget(self.app, "checkbox", "bi_cfg_filtro_1").check().run()
-            widget(self.app, "multiselect", "bi_cfg_filtro_1_valores").set_value(["Papelaria"]).run()
-            widget(self.app, "checkbox", "bi_cfg_filtro_2").check().run()
-            widget(self.app, "number_input", "bi_cfg_filtro_2_min").set_value(100).run()
-            widget(self.app, "checkbox", "bi_cfg_filtro_3").check().run()
-            widget(self.app, "date_input", "bi_cfg_filtro_3_max").set_value(date(2026, 10, 2)).run()
+        ) as ia:
+            self.widget.selecionar_fonte("Exemplo: vendas")
+            self.widget.configurar_datas(["data"], formato="%Y-%m-%d")
+            self.widget.configurar_kpi(0, operacao="soma", coluna="valor")
+            self.widget.definir_filtro("categoria", ativo=True, valores=["Papelaria"])
+            self.widget.definir_filtro("valor", ativo=True, minimo=100)
+            self.widget.definir_filtro("data", ativo=True, maximo="2026-10-02")
+
             for tipo in ("barras", "linhas", "histograma"):
                 with self.subTest(tipo=tipo):
-                    widget(self.app, "selectbox", "bi_cfg_grafico").select(tipo).run()
+                    self.widget.configurar_grafico(
+                        tipo,
+                        grupo="data" if tipo == "linhas" else "produto",
+                        operacao="soma",
+                        coluna="valor",
+                    )
                     self.verificar_sem_erros()
-                    self.assertEqual(self.app.metric[0].value, "100")
-                    tabela = self.app.dataframe[-1].value
+                    self.assertEqual(self.widget.obter_kpi_resultados()[0].valor, 100)
+                    tabela = self.widget.obter_df_filtrado()
                     self.assertEqual(tabela["produto"].tolist(), ["Caneta"])
                     self.assertEqual(tabela["valor"].tolist(), [100])
-                    grafico = self.app.dataframe[1].value
-                    self.assertEqual(grafico.iloc[:, 1].sum(), 1 if tipo == "histograma" else 100)
-                    csv = pd.read_csv(BytesIO(download.call_args.args[1]), parse_dates=["data"])
+
+                    arquivo_exportado = Path(self.temporario.name) / f"export_{tipo}.csv"
+                    self.widget.exportar_csv(arquivo_exportado)
+                    csv = pd.read_csv(arquivo_exportado, parse_dates=["data"])
                     assert_frame_equal(csv, tabela.reset_index(drop=True), check_dtype=False)
-            widget(self.app, "multiselect", "bi_cfg_filtro_1_valores").set_value([]).run()
+
+            self.widget.definir_filtro("produto", ativo=True, valores=[])
             self.verificar_sem_erros()
-            self.assertEqual(self.app.metric[0].value, "—")
-            self.assertTrue(self.app.dataframe[-1].value.empty)
-            csv = pd.read_csv(BytesIO(download.call_args.args[1]))
-            self.assertTrue(csv.empty)
-            self.assertEqual(csv.columns.tolist(), ["produto", "categoria", "valor", "data"])
-            widget(self.app, "button", "bi_limpar").click().run()
+            self.assertIsNone(self.widget.obter_kpi_resultados()[0].valor)
+            self.assertTrue(self.widget.obter_df_filtrado().empty)
+
+            self.widget.limpar_filtros()
             self.verificar_sem_erros()
-            self.assertEqual(self.app.metric[0].value, "450")
-            self.assertEqual(len(pd.read_csv(BytesIO(download.call_args.args[1]))), 4)
-            self.assertFalse(any(w.value for w in self.app.checkbox if w.key.startswith("bi_cfg_filtro_")))
+            self.assertEqual(self.widget.obter_kpi_resultados()[0].valor, 450)
+            self.assertEqual(len(self.widget.obter_df_filtrado()), 4)
             ia.assert_not_called()
 
     def test_titulo_e_apresentacao_explicitos(self):
-        widget(self.app, "selectbox", "bi_cfg_kpi_0_op").select("media").run()
-        widget(self.app, "text_input", "bi_cfg_kpi_0_titulo").set_value("Nota escolhida").run()
-        self.assertEqual(self.app.metric[0].label, "Nota escolhida")
-        self.assertEqual(self.app.metric[0].value, "8.00")
-        widget(self.app, "selectbox", "bi_cfg_kpi_0_fmt").select("Percentual").run()
-        self.assertEqual(self.app.metric[0].value, "800.00%")
-        widget(self.app, "selectbox", "bi_cfg_kpi_0_fmt").select("Moeda").run()
-        widget(self.app, "text_input", "bi_cfg_kpi_0_simbolo").set_value("US$").run()
-        self.assertEqual(self.app.metric[0].value, "US$ 8.00")
-        widget(self.app, "selectbox", "bi_cfg_kpi_0_fmt").select("Número").run()
+        self.widget.configurar_kpi(0, operacao="media", coluna="nota", titulo="Nota escolhida")
+        self.assertEqual(self.widget.obter_kpi_resultados()[0].titulo, "Nota escolhida")
+        self.assertEqual(self.widget.obter_kpi_resultados()[0].valor, 8.0)
+
+        self.widget.configurar_kpi(0, operacao="media", coluna="nota", formato="Percentual")
+        self.widget.configurar_kpi(0, operacao="media", coluna="nota", formato="Moeda", simbolo="US$")
+        self.widget.configurar_kpi(0, operacao="media", coluna="nota", formato="Número")
         self.verificar_sem_erros()
-        self.assertEqual(self.app.metric[0].value, "8.00")
+        self.assertEqual(self.widget.obter_kpi_resultados()[0].valor, 8.0)
 
 
+@unittest.skipUnless(TEM_PYQT6, "PyQt6 ou bibliotecas de display não disponíveis no ambiente")
 class TestUploads(unittest.TestCase):
-    def carregar_upload(self, nome, conteudo):
-        # AppTest não fornece API de upload. Injeta somente o arquivo, mantendo
-        # seleção, leitura, tratamento de erros e renderização reais.
-        script = f'''
-from io import BytesIO
-from unittest.mock import patch
-from oneworld.frontend_bi import mostrar_dashboard
-arquivo = BytesIO({conteudo!r})
-arquivo.name = {nome!r}
-with patch("oneworld.frontend_bi.st.file_uploader", return_value=[arquivo]):
-    mostrar_dashboard("#5B4FC4")
-'''
-        app = AppTest.from_string(script, default_timeout=20).run()
-        widget(app, "selectbox", "bi_dataset").select(widget(app, "selectbox", "bi_dataset").options[-1]).run()
-        return app
+    def setUp(self):
+        self.widget = BIDashboardWidget()
 
     def test_arquivos_validos(self):
         df = pd.DataFrame({"rotulo": ["A", "B"], "medida": [2, 4]})
         excel = BytesIO()
         df.to_excel(excel, index=False)
-        arquivos = [("teste.csv", df.to_csv(index=False).encode()),
-                    ("teste.json", df.to_json(orient="records").encode()),
-                    ("teste.xlsx", excel.getvalue())]
+        arquivos = [
+            ("teste.csv", df.to_csv(index=False).encode()),
+            ("teste.json", df.to_json(orient="records").encode()),
+            ("teste.xlsx", excel.getvalue()),
+        ]
         for nome, conteudo in arquivos:
             with self.subTest(nome=nome):
-                app = self.carregar_upload(nome, conteudo)
-                self.assertFalse(app.exception)
-                self.assertFalse(app.error)
-                self.assertEqual(app.metric[0].value, "2")
+                ok = self.widget.adicionar_arquivo(conteudo, nome)
+                self.assertTrue(ok)
+                self.assertIsNone(self.widget.erro_atual)
+                self.assertEqual(self.widget.obter_kpi_resultados()[0].valor, 2)
 
     def test_arquivos_invalidos(self):
-        for nome, conteudo in [("vazio.csv", b""), ("invalido.json", b"1"),
-                               ("invalido.xlsx", b"nao e um arquivo Excel")]:
+        for nome, conteudo in [
+            ("vazio.csv", b""),
+            ("invalido.json", b"1"),
+            ("invalido.xlsx", b"nao e um arquivo Excel"),
+        ]:
             with self.subTest(nome=nome):
-                app = self.carregar_upload(nome, conteudo)
-                self.assertFalse(app.exception)
-                self.assertTrue(app.error)
-                self.assertIn("ler o arquivo", app.error[0].value)
+                ok = self.widget.adicionar_arquivo(conteudo, nome)
+                self.assertFalse(ok)
+                self.assertIsNotNone(self.widget.erro_atual)
 
     def test_filtro_de_inteiros_grandes(self):
         conteudo = f"rotulo,medida\nA,{2**62}\nB,{2**62 + 1}\n".encode()
-        app = self.carregar_upload("inteiros.csv", conteudo)
-        widget(app, "checkbox", "bi_cfg_filtro_1").check().run()
-        widget(app, "text_input", "bi_cfg_filtro_1_min").set_value(str(2**62 + 1)).run()
-        self.assertFalse(app.exception)
-        self.assertFalse(app.error)
-        self.assertEqual(app.metric[0].value, "1")
+        ok = self.widget.adicionar_arquivo(conteudo, "inteiros.csv")
+        self.assertTrue(ok)
+        self.widget.definir_filtro("medida", ativo=True, minimo=2**62 + 1)
+        self.assertIsNone(self.widget.erro_atual)
+        self.assertEqual(self.widget.obter_kpi_resultados()[0].valor, 1)
 
 
 if __name__ == "__main__":

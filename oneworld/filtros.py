@@ -2,6 +2,7 @@
 import pandas as pd
 from numbers import Integral
 
+from .campos import converter_valor
 from .metadados import ErroBI, exigir_coluna, numeros_validos, validar_dataframe
 
 
@@ -22,7 +23,11 @@ def aplicar_filtros(df, configuracoes):
         elif tipo in ("numero", "data"):
             if tipo == "numero":
                 s = numeros_validos(df, nome)
-                converter = lambda v: int(v) if isinstance(v, Integral) else float(v)
+                tipo_campo = df.attrs.get("tipos_campos", {}).get(nome)
+                if tipo_campo in ("inteiro", "decimal"):
+                    converter = lambda v: converter_valor(v, tipo_campo) if isinstance(v, str) else v
+                else:
+                    converter = lambda v: int(v) if isinstance(v, Integral) else float(v)
             else:
                 # Compara dias locais sem deslocar timestamps para outro fuso.
                 s = s.dt.tz_localize(None).dt.normalize()

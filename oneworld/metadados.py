@@ -33,9 +33,12 @@ def inspecionar_colunas(df):
     """
     validar_dataframe(df)
     resultado = {}
+    tipos_campos = df.attrs.get("tipos_campos", {})
     for nome in df.columns:
         s = df[nome]
-        if is_datetime64_any_dtype(s.dtype):
+        if tipos_campos.get(nome) == "texto":
+            tipo = "texto"
+        elif is_datetime64_any_dtype(s.dtype):
             tipo = "data"
         elif is_bool_dtype(s.dtype):
             tipo = "categoria"
@@ -55,7 +58,7 @@ def exigir_coluna(df, nome, tipo=None):
     meta = inspecionar_colunas(df)
     if nome not in meta:
         raise ErroBI(f"Coluna ausente: {nome!r}.")
-    if meta[nome].tipo == "incompativel" or (tipo and meta[nome].tipo != tipo):
+    if meta[nome].tipo in ("texto", "incompativel") or (tipo and meta[nome].tipo != tipo):
         raise ErroBI(f"A coluna {nome!r} não é compatível com esta operação"
                      + (f" (tipo necessário: {tipo})." if tipo else "."))
     return df[nome]

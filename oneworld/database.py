@@ -1,4 +1,4 @@
-"""Camada de banco de dados (SQLite). Não conhece Streamlit nem regras de tela."""
+"""Camada de banco de dados (SQLite). Não conhece UI nem regras de tela."""
 import json
 import sqlite3
 from datetime import datetime
@@ -29,7 +29,7 @@ def consulta(sql, params=()):
 
 
 def init_db():
-    """Cria as tabelas (se não existirem) e insere os dados demonstrativos na primeira execução."""
+    """Cria as tabelas do banco de dados (se não existirem)."""
     con = sqlite3.connect(DB_PATH)
     try:
         con.executescript("""
@@ -50,26 +50,18 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT, pergunta TEXT, resposta TEXT);
         CREATE TABLE IF NOT EXISTS config(chave TEXT PRIMARY KEY, valor TEXT);
         """)
-        if not con.execute("SELECT 1 FROM config WHERE chave='seed'").fetchone():
-            con.executemany(
-                "INSERT INTO eventos(data,cliente,local,convidados,valor,status) VALUES(?,?,?,?,?,?)",
-                [("2026-10-10", "Cliente exemplo", "Espaço 01", 120, 15000.0, "Confirmado"),
-                 ("2026-10-18", "Organização exemplo", "Espaço 02", 80, 9200.0, "Em planejamento"),
-                 ("2026-10-25", "Cliente demonstrativo", "Espaço 03", 200, 24000.0, "Confirmado")])
-            con.executemany(
-                "INSERT INTO convidados(evento,nome,mesa,acompanhantes,contato,restricao,confirmacao)"
-                " VALUES(?,?,?,?,?,?,?)",
-                [("Cliente exemplo", "Pessoa exemplo", "01", 1, "contato@exemplo.com", "—", "Confirmado"),
-                 ("Cliente exemplo", "Outro convidado", "01", 2, "(00) 00000-0000", "Vegetariana", "Pendente")])
-            con.execute("INSERT INTO config VALUES('seed','1')")
         con.commit()
     finally:
         con.close()
 
 
 # ── Configurações persistidas ──
-def cfg_ler(chave, padrao):
-    df = consulta("SELECT valor FROM config WHERE chave=?", (chave,))
+def cfg_ler(chave, padrao, *, conexao=None):
+    sql = "SELECT valor FROM config WHERE chave=?"
+    if conexao is not None:
+        linha = conexao.execute(sql, (chave,)).fetchone()
+        return json.loads(linha[0]) if linha is not None else padrao
+    df = consulta(sql, (chave,))
     return json.loads(cast(str, df.iloc[0, 0])) if not df.empty else padrao
 
 
@@ -79,14 +71,34 @@ def cfg_gravar(chave, valor):
              (chave, json.dumps(valor, ensure_ascii=False)))
 
 
-# ── Eventos e convidados (CRUD genérico) ──
+def ler_campos_personalizados(*, conexao=None):
+    """Campos antigos são texto e mantêm o escopo já cadastrado."""
+    campos = cfg_ler("campos_personalizados", [], conexao=conexao)
+    return [
+        {"nome": campo, "tabelas": list(CAMPOS), "tipo": "texto"}
+        if isinstance(campo, str) else {"tipo": "texto", **campo}
+        for campo in campos
+    ]
+
+
+def campos_da_tabela(campos, tabela):
+    return [campo for campo in campos if tabela in campo["tabelas"]]
+
+
+# ── Operações (eventos) e Cadastros (convidados) — CRUD genérico ──
 def carregar(tab, campos_extras=()):
     """Lê uma tabela; campos personalizados (guardados em JSON) viram colunas."""
     ordem = "data, id" if tab == "eventos" else "id"
     df = consulta(f"SELECT * FROM {tab} ORDER BY {ordem}")
-    ex = df.pop("extras").apply(lambda s: json.loads(s) if s else {})
-    for campo in campos_extras:
-        df[campo] = ex.apply(lambda d, c=campo: d.get(c, ""))
+    return expandir_campos(df, campos_extras)
+
+
+def expandir_campos(df, nomes):
+    """Abre os valores do JSON sem inferir um dtype que altere inteiros ou nulos."""
+    extras = [json.loads(valor) if valor else {} for valor in df.pop("extras")]
+    for nome in nomes:
+        df[nome] = pd.Series((registro.get(nome) for registro in extras),
+                             index=df.index, dtype=object)
     return df
 
 
@@ -96,7 +108,7 @@ def inserir_lote(tab, registros, extras=None):
            f"VALUES({','.join('?' * (len(cols) + 1))})")
     con = sqlite3.connect(DB_PATH)
     try:
-        con.executemany(sql, [[r.get(c) for c in cols] + [json.dumps(extras or {}, ensure_ascii=False)]
+        con.executemany(sql, [[r.get(c) for c in cols] + [json.dumps(extras if extras is not None else r.get("extras", {}), ensure_ascii=False)]
                               for r in registros])
         con.commit()
     finally:
@@ -106,7 +118,21 @@ def inserir_lote(tab, registros, extras=None):
 def atualizar(tab, id_, dados, extras):
     cols = CAMPOS[tab]
     sql = f"UPDATE {tab} SET {','.join(c + '=?' for c in cols)}, extras=? WHERE id=?"
-    executar(sql, [dados.get(c) for c in cols] + [json.dumps(extras, ensure_ascii=False), int(id_)])
+    con = sqlite3.connect(DB_PATH)
+    try:
+        # Um formulário envia só os campos visíveis. Valores de campos removidos
+        # precisam sobreviver à edição e voltar se o campo for recriado.
+        with con:
+            con.execute("BEGIN IMMEDIATE")
+            atual = con.execute(f"SELECT extras FROM {tab} WHERE id=?", (int(id_),)).fetchone()
+            if atual is None:
+                return
+            valores = json.loads(atual[0]) if atual[0] else {}
+            valores.update(extras)
+            con.execute(sql, [dados.get(c) for c in cols] +
+                        [json.dumps(valores, ensure_ascii=False), int(id_)])
+    finally:
+        con.close()
 
 
 def excluir(tab, id_):
@@ -149,6 +175,8 @@ def excluir_anotacao(id_):
 
 # ── Relatórios da Orientação IA ──
 def salvar_relatorio(pergunta, resposta):
+    from . import ia  # IA externa (BYOK) se houver chave configurada; senão a resposta segue inalterada
+    resposta = ia.resposta_com_llm(pergunta, resposta)
     executar("INSERT INTO relatorios_ia(data,pergunta,resposta) VALUES(?,?,?)",
              (datetime.now().strftime("%d/%m/%Y %H:%M"), pergunta, resposta))
 

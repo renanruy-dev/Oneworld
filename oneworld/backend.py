@@ -1,5 +1,5 @@
 """Regras de negócio do OneWorld: formatação, importação de planilhas, validação,
-IA simulada, exportação em Markdown e lembretes. Não depende de Streamlit nem de SQL —
+IA simulada, exportação em Markdown e lembretes. Não depende de UI nem de SQL —
 recebe DataFrames/valores e devolve DataFrames/valores."""
 import json
 import re
@@ -8,8 +8,16 @@ from datetime import date, datetime
 
 import pandas as pd
 
-from .config import (ALIAS_OPCAO, ASSETS_DIR, LOGO_PADRAO, ROTULOS, SINONIMOS,
-                     STATUS_CONV, STATUS_EVENTO)
+from .campos import converter_valor
+from .config import (
+    ALIAS_OPCAO,
+    ASSETS_DIR,
+    LOGO_PADRAO,
+    SINONIMOS,
+    STATUS_CONV,
+    STATUS_EVENTO,
+    obter_vocabulario,
+)
 
 
 # ── Texto e conversões ──
@@ -82,12 +90,13 @@ def moeda(v, cfg):
 
 
 def formatar(df, tab, cfg):
-    """Versão amigável para tela: datas dd/mm/aaaa, valores em moeda, cabeçalhos em português."""
+    """Versão amigável para tela: datas dd/mm/aaaa, valores em moeda, cabeçalhos do perfil de negócio ativo."""
     t = df.copy()
     if tab == "eventos":
         t["data"] = t["data"].apply(fmt_data)
         t["valor"] = t["valor"].apply(lambda v: moeda(v, cfg))
-    return t.rename(columns=ROTULOS)
+    rotulos = obter_vocabulario(cfg)["rotulos"]
+    return t.rename(columns=rotulos)
 
 
 def md_tabela(df):
@@ -117,7 +126,7 @@ def filtrar_eventos(e, mes="Todos", status=()):
 
 
 def lembretes(e, hoje=None, dias=7):
-    """Eventos não concluídos que acontecem nos próximos `dias` dias."""
+    """Registros não concluídos que acontecem nos próximos `dias` dias."""
     hoje = hoje or date.today()
     out = []
     for r in e.itertuples():
@@ -130,14 +139,18 @@ def lembretes(e, hoje=None, dias=7):
 
 # ── Importação de planilhas ──
 def ler_arquivo(arq):
-    """Lê CSV (separador detectado), XLSX ou JSON de um arquivo enviado."""
-    nome = arq.name.lower()
+    """Lê CSV (separador detectado), XLSX ou JSON de um caminho (Path/str) ou objeto arquivo."""
+    nome = (arq.name if hasattr(arq, "name") else str(arq)).lower()
     if nome.endswith(".csv"):
         df = pd.read_csv(arq, sep=None, engine="python", encoding="utf-8-sig")
     elif nome.endswith(".xlsx"):
         df = pd.read_excel(arq)
     else:
-        dados = json.load(arq)
+        if hasattr(arq, "read"):
+            dados = json.load(arq)
+        else:
+            with open(arq, encoding="utf-8-sig") as f:
+                dados = json.load(f)
         if isinstance(dados, dict):
             dados = next((v for v in dados.values() if isinstance(v, list)), [dados])
         df = pd.json_normalize(dados)
@@ -145,11 +158,14 @@ def ler_arquivo(arq):
     return df
 
 
-def sugerir(colunas, destino):
-    """Sugere qual coluna do arquivo corresponde a cada campo (por nome; sem IA)."""
+def sugerir(colunas, destino, cfg=None):
+    """Sugere qual coluna do arquivo corresponde a cada campo (por nome e rótulo do perfil; sem IA)."""
     norm = {c: chave(c) for c in colunas}
+    rotulos_ativos = obter_vocabulario(cfg)["rotulos"]
     usadas, resultado = set(), {}
-    for campo, sins in SINONIMOS[destino].items():
+    for campo, sins_base in SINONIMOS[destino].items():
+        rot_custom = chave(rotulos_ativos.get(campo, ""))
+        sins = ([rot_custom] if rot_custom else []) + list(sins_base)
         achada = None
         for sin in sins:  # primeiro igualdade exata, depois "contém"
             achada = next((c for c in colunas if c not in usadas and norm[c] == sin), None)
@@ -157,7 +173,7 @@ def sugerir(colunas, destino):
                 break
         if not achada:
             for sin in sins:
-                achada = next((c for c in colunas if c not in usadas and sin in norm[c]), None)
+                achada = next((c for c in colunas if c not in usadas and sin and sin in norm[c]), None)
                 if achada:
                     break
         if achada:
@@ -166,7 +182,7 @@ def sugerir(colunas, destino):
     return resultado
 
 
-def validar(df, destino, mapa, existentes):
+def validar(df, destino, mapa, existentes, campos_personalizados=()):
     """Valida linha a linha. NÃO grava nada.
     `existentes` = DataFrame atual da tabela (para detectar duplicados).
     Retorna dict(ok=[registros], erros=[{linha, motivo}], duplicados=int, padrao=int)."""
@@ -174,11 +190,12 @@ def validar(df, destino, mapa, existentes):
         vistos = {(r.data, texto(r.cliente).lower()) for r in existentes.itertuples()}
     else:
         vistos = {(texto(r.evento).lower(), texto(r.nome).lower()) for r in existentes.itertuples()}
+    campos = [campo for campo in campos_personalizados if destino in campo["tabelas"]]
     ok, erros, dup, padrao = [], [], 0, 0
-    for i, row in df.iterrows():
+    linhas = df.attrs.get("linhas_arquivo", list(range(2, len(df) + 2)))
+    for linha, (_, row) in zip(linhas, df.iterrows()):
         if row.isna().all():
             continue
-        linha = i + 2  # +1 do cabeçalho, +1 por começar em 1
         g = {campo: (row[col] if col else None) for campo, col in mapa.items()}
         try:
             if destino == "eventos":
@@ -187,7 +204,7 @@ def validar(df, destino, mapa, existentes):
                     raise ValueError("data inválida ou vazia")
                 nome = texto(g.get("cliente"))
                 if not nome:
-                    raise ValueError("identificação do evento vazia")
+                    raise ValueError("identificação vazia")
                 status, usou = norm_opcao(g.get("status"), STATUS_EVENTO, "Em planejamento")
                 padrao += usou and bool(texto(g.get("status")))
                 reg = {"data": d.isoformat(), "cliente": nome, "local": texto(g.get("local")),
@@ -197,7 +214,7 @@ def validar(df, destino, mapa, existentes):
             else:
                 nome = texto(g.get("nome"))
                 if not nome:
-                    raise ValueError("nome vazio")
+                    raise ValueError("nome/registro vazio")
                 conf, usou = norm_opcao(g.get("confirmacao"), STATUS_CONV, "Pendente")
                 padrao += usou and bool(texto(g.get("confirmacao")))
                 reg = {"evento": texto(g.get("evento")), "nome": nome, "mesa": texto(g.get("mesa")),
@@ -208,6 +225,18 @@ def validar(df, destino, mapa, existentes):
         except ValueError as ex:
             erros.append({"Linha no arquivo": linha, "Motivo": str(ex)})
             continue
+        extras, erros_campos = {}, []
+        for campo in campos:
+            nome = campo["nome"]
+            try:
+                extras[nome] = converter_valor(g.get(nome), campo.get("tipo", "texto"))
+            except ValueError as exc:
+                erros_campos.append({"Linha no arquivo": linha, "Campo": nome, "Motivo": str(exc)})
+        if erros_campos:
+            erros.extend(erros_campos)
+            continue
+        if campos:
+            reg["extras"] = extras
         if k in vistos:
             dup += 1
             continue
@@ -216,48 +245,56 @@ def validar(df, destino, mapa, existentes):
     return {"ok": ok, "erros": erros, "duplicados": dup, "padrao": padrao}
 
 
-# ── IA simulada e exportação ──
+# ── IA simulada e exportação (adaptáveis ao perfil do negócio) ──
 def responder_ia(pergunta, e, cv, cfg):
     """Resposta SIMULADA por regras locais (não há IA externa conectada)."""
+    v = obter_vocabulario(cfg)
+    ent1_p = v["ent1_plural"].lower()
+    ent2_p = v["ent2_plural"].lower()
+    rot_qtd = v["metric_qtd"].lower()
     p = sem_acento(pergunta)
     if e.empty:
         return "Não existem dados suficientes para análise."
-    m = lambda v: moeda(v, cfg)  # noqa: E731
+    m = lambda val: moeda(val, cfg)  # noqa: E731
     if re.search(r"\b(mes|meses|periodo)\b", p):
         por_mes = e.assign(mes=pd.to_datetime(e["data"]).dt.strftime("%m/%Y")).groupby("mes")["valor"].sum()
-        return "Receita prevista por mês: " + "; ".join(f"{k}: {m(v)}" for k, v in por_mes.items()) + "."
-    if any(k in p for k in ["receita", "valor", "faturamento"]):
+        return f"{v['metric_valor']} por mês: " + "; ".join(f"{k}: {m(val)}" for k, val in por_mes.items()) + "."
+    if any(k in p for k in ["receita", "valor", "faturamento", "orcamento"]):
         top = e.sort_values("valor", ascending=False).iloc[0]
-        return (f"A receita prevista cadastrada é {m(e['valor'].sum())}, média de "
-                f"{m(e['valor'].mean())} por evento. O maior valor previsto é de "
-                f"{top['cliente']} ({m(top['valor'])}). Valores previstos não são pagamentos recebidos.")
-    if "convidado" in p:
+        return (f"O total de {v['metric_valor'].lower()} é {m(e['valor'].sum())}, média de "
+                f"{m(e['valor'].mean())} por registro. O maior valor registrado é de "
+                f"{top['cliente']} ({m(top['valor'])}).")
+    if any(k in p for k in ["convidado", "cadastro", "cliente", "item", "volume", "quantidade"]):
         conf = int((cv["confirmacao"] == "Confirmado").sum()) if not cv.empty else 0
-        return (f"O total previsto nos eventos é {int(e['convidados'].sum())} convidados; "
-                f"{conf} de {len(cv)} convidados cadastrados já confirmaram.")
-    if "pendente" in p or "planejamento" in p:
+        return (f"O total acumulado de {rot_qtd} é {int(e['convidados'].sum())}; "
+                f"{conf} de {len(cv)} registros em {ent2_p} estão com situação confirmada.")
+    if "pendente" in p or "planejamento" in p or "aberto" in p:
         pend = e[e["status"].isin(["Pendente", "Em planejamento"])]
-        return f"Há {len(pend)} evento(s) pendentes ou em planejamento: " + (
+        return f"Há {len(pend)} registro(s) pendentes ou em planejamento em {ent1_p}: " + (
             ", ".join(pend["cliente"]) if len(pend) else "nenhum.")
     if "confirm" in p:
-        return f"Existem {int((e['status'] == 'Confirmado').sum())} eventos confirmados de {len(e)}."
-    return (f"Resumo: {len(e)} eventos, {int(e['convidados'].sum())} convidados previstos e "
-            f"{m(e['valor'].sum())} de receita prevista.")
+        return f"Existem {int((e['status'] == 'Confirmado').sum())} registros confirmados de {len(e)} em {ent1_p}."
+    return (f"Resumo ({cfg.get('perfil_negocio', '')}): {len(e)} registros em {ent1_p}, "
+            f"{int(e['convidados'].sum())} em {rot_qtd} e {m(e['valor'].sum())} em {v['metric_valor'].lower()}.")
 
 
 def gerar_markdown(e, cv, cfg):
+    v = obter_vocabulario(cfg)
     ev = formatar(e.drop(columns=["id"]), "eventos", cfg)
     cvf = formatar(cv.drop(columns=["id"]), "convidados", cfg)
-    resumo = [f"- Eventos: {len(e)}",
-              f"- Convidados previstos: {int(e['convidados'].sum())}",
-              f"- Receita prevista: {moeda(e['valor'].sum(), cfg)} (valores previstos, não pagamentos recebidos)",
-              f"- Convidados confirmados: {int((cv['confirmacao'] == 'Confirmado').sum())} de {len(cv)}"]
+    resumo = [
+        f"- Perfil do negócio: {cfg.get('perfil_negocio', 'Gestão Empresarial (Geral)')}",
+        f"- {v['metric_ent1']}: {len(e)}",
+        f"- {v['metric_qtd']}: {int(e['convidados'].sum())}",
+        f"- {v['metric_valor']}: {moeda(e['valor'].sum(), cfg)}",
+        f"- {v['metric_ent2_conf']}: {int((cv['confirmacao'] == 'Confirmado').sum())} de {len(cv)}",
+    ]
     return (f"# {cfg['nome']} — exportação de dados\n\n"
             f"Gerado em {datetime.now():%d/%m/%Y %H:%M}\n\n## Resumo\n" + "\n".join(resumo) +
-            f"\n\n## Eventos\n{md_tabela(ev)}\n## Convidados\n{md_tabela(cvf)}\n"
+            f"\n\n## {v['ent1_plural']}\n{md_tabela(ev)}\n## {v['ent2_plural']}\n{md_tabela(cvf)}\n"
             "## Sugestão de prompt para IA externa\n"
-            "Analise os dados acima, destaque padrões e riscos (ex.: eventos pendentes, concentração de "
-            "receita por mês) e sugira alternativas. Não invente dados que não estejam nas tabelas.\n")
+            "Analise os dados acima, destaque padrões e riscos (ex.: registros pendentes, concentração de "
+            "valores por período) e sugira alternativas estratégicas. Não invente dados que não estejam nas tabelas.\n")
 
 
 # ── Logotipo ──

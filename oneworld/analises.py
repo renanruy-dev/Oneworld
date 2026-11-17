@@ -1,5 +1,6 @@
 """Prepara tabelas para gráficos; não renderiza nem acessa serviços."""
 import pandas as pd
+from pandas.api.types import is_bool_dtype, is_datetime64_any_dtype, is_numeric_dtype
 
 from .indicadores import AGREGACOES
 from .metadados import ErroBI, exigir_coluna, numeros_validos, validar_dataframe
@@ -10,7 +11,8 @@ def preparar_grafico(df, configuracao):
 
     Grupos nulos são excluídos. Medidas ignoram nulos e infinitos; grupos sem
     medidas válidas não aparecem. Contagem contabiliza linhas por grupo.
-    Linhas permitem períodos dia/mês, ordenados, sem preencher lacunas.
+    Valores distintos contabilizam os valores não nulos da medida por grupo.
+    Linhas ordenam dimensões numéricas ou datas agrupadas por dia/mês.
     """
     validar_dataframe(df)
     tipo = configuracao.get("tipo")
@@ -29,20 +31,28 @@ def preparar_grafico(df, configuracao):
                              "frequencia": contagens.to_numpy()})
     if tipo not in ("barras", "linhas"):
         raise ErroBI("Tipo de gráfico desconhecido.")
-    grupo = exigir_coluna(df, configuracao.get("grupo"),
-                          "data" if tipo == "linhas" else "categoria")
-    if tipo == "linhas":
+    nome_grupo = configuracao.get("grupo")
+    grupo = exigir_coluna(df, nome_grupo)
+    numerico = is_numeric_dtype(grupo.dtype) and not is_bool_dtype(grupo.dtype)
+    if numerico:
+        grupo = numeros_validos(df, nome_grupo)
+    elif tipo == "linhas" and is_datetime64_any_dtype(grupo.dtype):
         periodo = configuracao.get("periodo", "dia")
         if periodo not in ("dia", "mes"):
             raise ErroBI("Período temporal inválido; escolha dia ou mes.")
         grupo = grupo.dt.tz_localize(None)
         grupo = (grupo.dt.normalize() if periodo == "dia"
                  else grupo.dt.to_period("M").dt.to_timestamp())
+    else:
+        exigir_coluna(df, nome_grupo, "data" if tipo == "linhas" else "categoria")
     operacao = configuracao.get("operacao", "contagem")
     # Constrói nomes internos novos para aceitar quaisquer nomes na origem.
     tabela = pd.DataFrame({"grupo": grupo.to_numpy()})
     if operacao == "contagem":
         resultado = tabela.groupby("grupo", observed=True, dropna=True, sort=False).size()
+    elif operacao == "distintos":
+        tabela["medida"] = exigir_coluna(df, configuracao.get("coluna")).to_numpy()
+        resultado = tabela.groupby("grupo", observed=True, sort=False)["medida"].nunique()
     elif operacao in AGREGACOES:
         medida = numeros_validos(df, configuracao.get("coluna"))
         # Preserva inteiros nullable; to_numpy() pode convertê-los para float
@@ -60,5 +70,5 @@ def preparar_grafico(df, configuracao):
         raise ErroBI("Agregação de gráfico desconhecida.")
     # Categorias compatíveis podem misturar texto e booleanos (por exemplo JSON).
     # Ordena pelos rótulos sem comparar str com bool nem alterar os grupos.
-    chave = (lambda indice: indice.map(str)) if tipo == "barras" else None
+    chave = (lambda indice: indice.map(str)) if tipo == "barras" and not numerico else None
     return resultado.rename("valor").sort_index(key=chave).reset_index()
