@@ -2,9 +2,10 @@
 Só desenha e coleta ações do usuário; regras ficam em backend.py e SQL em database.py."""
 from __future__ import annotations
 
+import html
 import math
 import sys
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -28,6 +29,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMessageBox,
     QPlainTextEdit,
     QPushButton,
     QRadioButton,
@@ -42,6 +44,7 @@ from PyQt6.QtWidgets import (
 )
 
 from . import backend as bk
+from . import backup as bkp
 from . import database as db
 from . import ia
 from . import mapeamento as mp
@@ -665,14 +668,7 @@ class OneWorldWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         db.init_db()
-        cfg = {**PADROES, **db.cfg_ler("config", {})}
-        if cfg.get("texto") not in ("P", "M", "G"):
-            cfg["texto"] = "M"
-        if cfg.get("perfil_negocio") not in PERFIS_NEGOCIO:
-            cfg["perfil_negocio"] = PERFIL_PADRAO
-        if not isinstance(cfg.get("rotulos_custom"), dict):
-            cfg["rotulos_custom"] = {}
-        self.cfg: dict = cfg
+        self.cfg: dict = self._ler_configuracoes()
         self.campos_personalizados: list[str] = db.cfg_ler("campos_personalizados", [])
         self.notificacoes: list[str] = []
         self.pagina_atual: str = self.cfg.get("pagina_inicial", "Dashboard")
@@ -722,6 +718,18 @@ class OneWorldWindow(QMainWindow):
         self.reconstruir_pagina()
 
     # ── Helpers de estado, vocabulário e dados ──
+    @staticmethod
+    def _ler_configuracoes() -> dict:
+        """Lê as configurações do banco, completando com os padrões e corrigindo valores inválidos."""
+        cfg = {**PADROES, **db.cfg_ler("config", {})}
+        if cfg.get("texto") not in ("P", "M", "G"):
+            cfg["texto"] = "M"
+        if cfg.get("perfil_negocio") not in PERFIS_NEGOCIO:
+            cfg["perfil_negocio"] = PERFIL_PADRAO
+        if not isinstance(cfg.get("rotulos_custom"), dict):
+            cfg["rotulos_custom"] = {}
+        return cfg
+
     def vocab(self) -> dict:
         return obter_vocabulario(self.cfg)
 
@@ -1960,6 +1968,7 @@ class OneWorldWindow(QMainWindow):
         l_dds.addLayout(form_dd)
         l_dds.addWidget(QLabel("Integrações externas (pagamentos, calendário, API): fora do escopo confirmado do MVP."))
         l_dds.addWidget(QLabel("Exportação: CSV por tabela e Markdown na tela Orientação IA."))
+        l_dds.addWidget(QLabel("Backup completo (exportar/importar JSON): aba Segurança."))
         l_dds.addStretch(1)
         abas.addTab(w_dds, "Dados && integrações")
 
@@ -1984,11 +1993,39 @@ class OneWorldWindow(QMainWindow):
         l_seg.addWidget(btn_bkp, alignment=Qt.AlignmentFlag.AlignLeft)
 
         cap_bkp = QLabel(
-            f"{db.contar_backups()} backup(s) na pasta {BACKUP_DIR}. "
-            "A restauração ainda é um requisito pendente."
+            f"Cópia rápida do banco (.db): {db.contar_backups()} arquivo(s) na pasta {BACKUP_DIR}. "
+            "Para restaurar ou complementar dados, use o backup completo abaixo."
         )
         cap_bkp.setObjectName("Caption")
+        cap_bkp.setWordWrap(True)
         l_seg.addWidget(cap_bkp)
+
+        l_seg.addWidget(Divider())
+        l_seg.addWidget(self._subtitulo("Backup completo (arquivo JSON)"))
+        cap_json = QLabel(
+            f"Inclui {v['ent1_plural']}, {v['ent2_plural']}, anotações, relatórios de IA, histórico de "
+            "arquivos importados e configurações. Não inclui o arquivo .env, chaves de API nem o banco "
+            "público DFP. Ao importar, você escolhe entre substituir os dados atuais ou adicionar apenas "
+            "o que falta."
+        )
+        cap_json.setObjectName("Caption")
+        cap_json.setWordWrap(True)
+        l_seg.addWidget(cap_json)
+
+        linha_json = QHBoxLayout()
+        btn_exp_json = QPushButton("Exportar backup...")
+        btn_exp_json.setObjectName("PrimaryBtn")
+        btn_exp_json.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_exp_json.clicked.connect(self._exportar_backup)
+        btn_imp_json = QPushButton("Importar backup...")
+        btn_imp_json.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_imp_json.clicked.connect(self._importar_backup)
+        linha_json.addWidget(btn_exp_json)
+        linha_json.addWidget(btn_imp_json)
+        linha_json.addStretch(1)
+        l_seg.addLayout(linha_json)
+
+        l_seg.addWidget(Divider())
         l_seg.addWidget(AlertBox("Chaves de API (BYOK) devem ficar no arquivo .env, nunca no código.", "warning"))
 
         btn_testar_ia = QPushButton("Testar conexão com a IA")
@@ -2239,6 +2276,238 @@ class OneWorldWindow(QMainWindow):
             self.campos_personalizados.remove(cp)
             db.cfg_gravar("campos_personalizados", self.campos_personalizados)
             self.reconstruir_pagina()
+
+    # ── Backup completo (JSON): exportar e importar ──
+    # Todos os diálogos modais passam por _escolher_modo_importacao, _confirmar e _mostrar_mensagem,
+    # o que permite testar os fluxos (inclusive cancelamentos) sem abrir janelas.
+    def _nomes_tabelas_backup(self) -> dict[str, str]:
+        v = self.vocab()
+        return {**bkp.NOMES_TABELAS, "eventos": v["ent1_plural"], "convidados": v["ent2_plural"]}
+
+    def _mostrar_mensagem(self, tipo: str, titulo: str, texto: str):
+        icones = {
+            "info": QMessageBox.Icon.Information,
+            "aviso": QMessageBox.Icon.Warning,
+            "erro": QMessageBox.Icon.Critical,
+        }
+        caixa = QMessageBox(icones.get(tipo, QMessageBox.Icon.Information), titulo, texto,
+                            QMessageBox.StandardButton.Ok, self)
+        caixa.setTextFormat(Qt.TextFormat.RichText)
+        caixa.exec()
+
+    def _confirmar(self, titulo: str, texto: str, rotulo_ok: str) -> bool:
+        caixa = QMessageBox(QMessageBox.Icon.Warning, titulo, texto, parent=self)
+        caixa.setTextFormat(Qt.TextFormat.RichText)
+        btn_ok = caixa.addButton(rotulo_ok, QMessageBox.ButtonRole.AcceptRole)
+        btn_cancelar = caixa.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
+        caixa.setDefaultButton(btn_cancelar)
+        caixa.setEscapeButton(btn_cancelar)
+        caixa.exec()
+        return caixa.clickedButton() is btn_ok
+
+    def _escolher_modo_importacao(self, texto: str) -> str | None:
+        """Devolve 'substituir', 'mesclar' ou None (cancelado)."""
+        caixa = QMessageBox(QMessageBox.Icon.Question, "Importar backup", texto, parent=self)
+        caixa.setTextFormat(Qt.TextFormat.RichText)
+        btn_sub = caixa.addButton("Substituir dados atuais", QMessageBox.ButtonRole.ActionRole)
+        btn_mes = caixa.addButton("Adicionar apenas o que falta", QMessageBox.ButtonRole.ActionRole)
+        btn_cancelar = caixa.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
+        caixa.setDefaultButton(btn_cancelar)
+        caixa.setEscapeButton(btn_cancelar)
+        caixa.exec()
+        clicado = caixa.clickedButton()
+        if clicado is btn_sub:
+            return "substituir"
+        if clicado is btn_mes:
+            return "mesclar"
+        return None
+
+    @staticmethod
+    def _tabela_html(cabecalho: list[str], linhas: list[list]) -> str:
+        th = "".join(f"<th align='left' style='padding:2px 10px 2px 0'>{html.escape(str(c))}</th>"
+                     for c in cabecalho)
+        corpo = "".join(
+            "<tr>" + "".join(f"<td style='padding:2px 10px 2px 0'>{html.escape(str(c))}</td>" for c in lin)
+            + "</tr>" for lin in linhas
+        )
+        return f"<table><tr>{th}</tr>{corpo}</table>"
+
+    def _exportar_backup(self):
+        nome = f"oneworld_backup_{datetime.now():%Y%m%d_%H%M%S}.json"
+        pasta = BACKUP_DIR if BACKUP_DIR.is_dir() else Path.home()
+        caminho, _ = QFileDialog.getSaveFileName(
+            self, "Exportar backup do OneWorld", str(pasta / nome), "Backup do OneWorld (*.json)"
+        )
+        if not caminho:
+            return
+        destino = Path(caminho)
+        if destino.suffix.lower() != ".json":
+            destino = destino.with_name(destino.name + ".json")
+        try:
+            res = bkp.exportar(destino)
+        except bkp.BackupErro as e:
+            self._mostrar_mensagem("erro", "Falha ao exportar backup", html.escape(str(e)))
+            return
+        except Exception as e:  # noqa: BLE001 — a exportação só lê o banco; nada foi alterado
+            self._mostrar_mensagem("erro", "Falha ao exportar backup",
+                                   html.escape(f"Erro inesperado ao exportar: {e}"))
+            return
+        total = sum(n for t, n in res.contagens.items() if t != "config")
+        self.aviso(f"Backup exportado: {res.caminho.name}")
+        msg = f"Backup exportado ({total} registro(s)) em: {res.caminho}"
+        if res.segredos_removidos:
+            msg += f" — {res.segredos_removidos} item(ns) com aparência de segredo foram omitidos."
+        self.flash(msg)
+        self.reconstruir_pagina()
+
+    def _importar_backup(self):
+        try:
+            self._fluxo_importar_backup()
+        except Exception as e:  # noqa: BLE001 — erro imprevisto não pode derrubar o app; gravações são transacionais
+            self._mostrar_mensagem(
+                "erro", "Erro inesperado na importação",
+                html.escape(f"{e}") + "<br><br>Qualquer gravação em andamento foi desfeita.",
+            )
+
+    def _fluxo_importar_backup(self):
+        pasta = BACKUP_DIR if BACKUP_DIR.is_dir() else Path.home()
+        caminho, _ = QFileDialog.getOpenFileName(
+            self, "Importar backup do OneWorld", str(pasta), "Backup do OneWorld (*.json)"
+        )
+        if not caminho:
+            return
+        try:
+            backup = bkp.ler_backup(caminho)
+        except bkp.BackupErro as e:
+            self._mostrar_mensagem("aviso", "Arquivo de backup inválido",
+                                   html.escape(str(e)) + "<br><br>Nenhum dado foi alterado.")
+            return
+
+        nomes = self._nomes_tabelas_backup()
+        try:
+            gerado = datetime.fromisoformat(backup.gerado_em).strftime("%d/%m/%Y %H:%M")
+        except ValueError:
+            gerado = backup.gerado_em
+        resumo = (
+            f"<b>Arquivo:</b> {html.escape(Path(caminho).name)}<br>"
+            f"<b>Gerado em:</b> {html.escape(gerado)}<br><br>"
+            + self._tabela_html(["Conteúdo do backup", "Registros"],
+                                [[nomes[t], n] for t, n in backup.contagens.items()])
+            + f"<br>Campos personalizados no backup: {len(backup.campos_personalizados)}<br><br>"
+            "<b>Substituir dados atuais</b>: apaga todos os dados e configurações atuais e coloca os do "
+            "backup (antes, salva uma cópia de segurança do banco).<br>"
+            "<b>Adicionar apenas o que falta</b>: mantém tudo o que existe e acrescenta só os registros do "
+            "backup que ainda não estão no sistema."
+        )
+        modo = self._escolher_modo_importacao(resumo)
+        if modo == "substituir":
+            self._importar_substituindo(backup, nomes)
+        elif modo == "mesclar":
+            self._importar_mesclando(backup, nomes)
+
+    def _importar_substituindo(self, backup: bkp.Backup, nomes: dict[str, str]):
+        try:
+            atuais = bkp.contagens_atuais()
+        except bkp.BackupErro as e:
+            self._mostrar_mensagem("erro", "Não foi possível restaurar", html.escape(str(e)))
+            return
+        texto = (
+            "<b>Todos os dados atuais serão apagados</b> e substituídos pelos do backup:<br><br>"
+            + self._tabela_html(["Tabela", "Atual (será apagado)", "Backup (será restaurado)"],
+                                [[nomes[t], atuais[t], backup.contagens[t]] for t in bkp.TABELAS])
+            + "<br>As configurações também serão substituídas; alterações ainda não salvas nesta tela "
+            "serão descartadas.<br>Antes de alterar qualquer dado, uma cópia de segurança do banco atual "
+            f"será salva em {html.escape(str(BACKUP_DIR))}.<br><br>Deseja continuar?"
+        )
+        if not self._confirmar("Substituir dados atuais", texto, "Sim, substituir"):
+            return
+        try:
+            res = bkp.substituir(backup)
+        except bkp.BackupErro as e:
+            self._mostrar_mensagem("erro", "Restauração não concluída", html.escape(str(e)))
+            return
+        self._recarregar_apos_importacao(substituiu=True)
+        total = sum(n for t, n in res.adicionados.items() if t != "config")
+        self.aviso(f"Backup restaurado: {total} registro(s)")
+        self._mostrar_mensagem(
+            "info", "Backup restaurado",
+            f"Dados restaurados a partir do backup ({total} registro(s)).<br>"
+            f"Cópia de segurança do banco anterior: {html.escape(str(res.copia_seguranca))}",
+        )
+
+    def _importar_mesclando(self, backup: bkp.Backup, nomes: dict[str, str]):
+        try:
+            plano = bkp.planejar_mesclagem(backup)
+        except bkp.BackupErro as e:
+            self._mostrar_mensagem("erro", "Não foi possível comparar os dados", html.escape(str(e)))
+            return
+
+        if plano.conflitos:
+            itens = "".join(f"<li><b>{html.escape(c.nome)}</b>: {html.escape(c.motivo)}</li>"
+                            for c in plano.conflitos)
+            texto_conf = (
+                "Alguns campos personalizados do backup são incompatíveis com os atuais e "
+                f"<b>não serão adicionados</b> à lista de campos:<ul>{itens}</ul>"
+                "Os valores desses campos nos registros importados serão gravados exatamente como estão no "
+                "backup (nos dados extras de cada registro), mas não aparecerão como coluna.<br><br>"
+                "Deseja continuar sem adicionar esses campos?"
+            )
+            if not self._confirmar("Campos personalizados em conflito", texto_conf,
+                                   "Continuar sem esses campos"):
+                return
+
+        if not plano.tem_algo_a_fazer:
+            self._mostrar_mensagem("info", "Nada a adicionar",
+                                   "Todos os registros e campos do backup já existem no sistema. "
+                                   "Nenhum dado foi alterado.")
+            return
+
+        linhas = [[nomes[t], len(backup.tabelas[t]), plano.contagem_adicionar[t], plano.ignorados[t]]
+                  for t in bkp.TABELAS_DADOS]
+        campos_txt = (", ".join(html.escape(c) for c in plano.campos_novos) if plano.campos_novos
+                      else "nenhum")
+        texto = (
+            self._tabela_html(["Tabela", "No backup", "Serão adicionados", "Já existem (ignorados)"], linhas)
+            + f"<br>Campos personalizados que serão adicionados: {campos_txt}<br><br>"
+            "Os registros são comparados pelo conteúdo completo (sem o ID). Um registro com qualquer "
+            "diferença — inclusive espaços, maiúsculas ou campos extras — é considerado novo. "
+            "Este modo <b>não atualiza nem remove</b> registros existentes, e as configurações atuais são "
+            "mantidas.<br><br>Deseja adicionar os registros que faltam?"
+        )
+        if not self._confirmar("Adicionar apenas o que falta", texto, "Adicionar"):
+            return
+        try:
+            res = bkp.aplicar_mesclagem(backup)
+        except bkp.BackupErro as e:
+            self._mostrar_mensagem("erro", "Importação não concluída", html.escape(str(e)))
+            return
+        self._recarregar_apos_importacao(substituiu=False)
+        total_add = sum(res.adicionados.values())
+        total_ign = sum(res.ignorados.values())
+        self.aviso(f"Backup importado: {total_add} registro(s) adicionado(s)")
+        linhas_res = [[nomes[t], res.adicionados[t], res.ignorados[t]] for t in bkp.TABELAS_DADOS]
+        extra = ""
+        if res.campos_adicionados:
+            extra += "<br>Campos adicionados: " + ", ".join(html.escape(c) for c in res.campos_adicionados)
+        if res.conflitos:
+            extra += "<br>Campos não adicionados (conflito): " + ", ".join(
+                html.escape(c.nome) for c in res.conflitos)
+        self._mostrar_mensagem(
+            "info", "Importação concluída",
+            f"{total_add} registro(s) adicionado(s) e {total_ign} ignorado(s) por já existirem.<br><br>"
+            + self._tabela_html(["Tabela", "Adicionados", "Ignorados"], linhas_res) + extra,
+        )
+
+    def _recarregar_apos_importacao(self, substituiu: bool):
+        """Relê do banco o que a tela guarda em memória, para que o estado antigo não sobrescreva o novo."""
+        self.campos_personalizados = db.cfg_ler("campos_personalizados", [])
+        if substituiu:
+            self.cfg = self._ler_configuracoes()
+            aba = self.estado.get("tab_config")
+            self.estado = {} if aba is None else {"tab_config": aba}
+            self.aplicar_tema()
+        self.reconstruir_sidebar()
+        self.reconstruir_pagina()
 
 
 def main():
