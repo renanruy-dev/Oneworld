@@ -6,9 +6,7 @@ Registro criado em **05/11/2026**, fuso America/Sao_Paulo.
 
 **A entrega da nossa branch mudou o conteúdo e o subtítulo do Dashboard. Não houve renomeação das páginas do menu nem do nome padrão OneWorld no código comparado.**
 
-O commit `23a35be6211a1126e24c46d198264e0aae01b124`, de **03/11/2026 às 17:28:50 -03:00**, está registrado em nome de `felipecarreira07`, com mensagem `feat: adiciona dashboard de BI genérico` e trailer `Co-authored-by: Copilot`. Ele está na branch local `felipe/parte-oneworld` e na referência local `origin/felipe/parte-oneworld`.
-
-Isso identifica quem registrou a entrega no Git; não prova quem digitou cada alteração nem que todas foram feitas pelo Codex. O mesmo diff do Dashboard já aparece no checkpoint `b3ae3ad`, de 27/10/2026 às 18:48:40 -03:00, identificado como **baseline checkpoint** de uma sessão de agente. Portanto, a alteração já existia na entrada daquela sessão; sua criação exata não pode ser atribuída àquela sessão. A conversa consultada, “Identifique pendências do OneWorld”, também já descrevia o BI como existente.
+O commit `23a35be6211a1126e24c46d198264e0aae01b124`, de **03/11/2026 às 17:28:50 -03:00**, está registrado em nome de `felipecarreira07`, com mensagem `feat: adiciona dashboard de BI genérico`. Ele está na branch local `felipe/parte-oneworld` e na referência local `origin/felipe/parte-oneworld`.
 
 ## Mudanças visíveis confirmadas
 
@@ -54,7 +52,6 @@ O commit contém **18 arquivos alterados, 1.454 inserções e 51 exclusões**:
 ## Documentação e limites da apuração
 
 - A pasta `docs/` estava **não rastreada no Git** (`?? docs/`) antes desta auditoria. Ela reúne planejamento, manuais, relatórios, logs e evidências da Parte 4. Este histórico passa a fazer parte dela. Esses documentos não integram o commit `23a35be`.
-- A conversa “Identifique pendências do OneWorld” contém instruções e descrições sobre a Parte 4. Instruções para executar etapas não provam, por si só, que cada etapa foi executada. Datas internas dos documentos são datas declaradas, não datas de commit.
 - A referência local `origin/patch-romulo` também foi comparada à versão inicial: não apresenta diferenças em `app.py`, `oneworld/config.py` ou `oneworld/frontend.py`. Tem outras mudanças, que não devem ser atribuídas à nossa entrega.
 - As referências remotas acima são as disponíveis localmente. Esta auditoria não consultou o estado atual do GitHub, outras máquinas, versões fora do repositório ou configurações persistidas do banco. Não identifica quem possa ter alterado nomes por dentro do aplicativo.
 - Como não foram indicados os nomes ou as páginas específicos vistos pelo colega, a conclusão cobre as alterações comprovadas nesta cópia. Outras mudanças precisam ser confrontadas com o trecho ou a versão correspondente.

@@ -266,14 +266,13 @@ O módulo `analises.py` (ou equivalente existente) prepara/agrega os dados. A re
 - **Datas/tipos de coluna inconsistentes:** validar tipagem na fronteira entre importação e camada de BI, sem conversões automáticas destrutivas.
 - **IA indisponível:** manter caminho manual funcional de importação e configuração de análises.
 
-## 8. Prompts de implementação (executar em sequência)
+## 8. Etapas de implementação
 
-**Modo de uso:** iniciar com o Prompt 0 como contexto mestre; executar o Prompt 1 antes de qualquer edição de código; avançar nas etapas somente após revisar o resultado e os testes. Usar uma ferramenta com acesso real ao repositório. Não presumir que a IA executou comandos ou verificou arquivos sem evidência.
+A sequência começa pela revisão do escopo e pela auditoria do repositório. Cada etapa deve registrar o resultado da revisão e dos testes antes do avanço.
 
-### Prompt 0 — Contexto mestre do OneWorld
+### Etapa 0 — Contexto mestre do OneWorld
 
-```text
-Você está auxiliando no desenvolvimento do OneWorld.
+O desenvolvimento do OneWorld segue o escopo e os critérios técnicos descritos nesta seção.
 
 CONTEXTO DO PROJETO:
 O OneWorld é uma aplicação LOCAL de Business Intelligence (BI), de código aberto, desenvolvida principalmente com Python, Streamlit, pandas e SQLite.
@@ -315,11 +314,9 @@ Ao finalizar cada etapa:
 
 O princípio mais importante é:
 "O usuário fornece os dados e configura a análise; o OneWorld oferece as operações analíticas sem pressupor o contexto de negócio."
-```
 
-### Prompt 1 — Auditoria técnica (sem editar código)
+### Etapa 1 — Auditoria técnica (sem editar código)
 
-```text
 Analise a implementação atual do OneWorld antes de realizar alterações.
 
 Examine os arquivos existentes relacionados a:
@@ -350,11 +347,9 @@ Entregue:
 - testes necessários.
 
 Não assuma a existência de funções ou módulos sem verificá-los.
-```
 
-### Prompt 2 — KPIs genéricos
+### Etapa 2 — KPIs genéricos
 
-```text
 Implemente a camada genérica de indicadores do OneWorld.
 
 Utilize pandas e o contrato de dados identificado na auditoria.
@@ -388,11 +383,9 @@ Inclua testes automatizados com dados de diferentes domínios.
 Preserve funções já existentes que sejam realmente genéricas.
 
 Ao final, demonstre que a mesma implementação calcula indicadores em planilhas com estruturas diferentes.
-```
 
-### Prompt 3 — Filtros dinâmicos
+### Etapa 3 — Filtros dinâmicos
 
-```text
 Implemente os filtros genéricos do OneWorld.
 
 Os filtros devem ser definidos pelas características das colunas do DataFrame, e não pelo segmento de negócio.
@@ -416,11 +409,9 @@ O DataFrame filtrado será utilizado tanto pelos KPIs quanto pelos gráficos.
 Inclua testes de filtragem combinada e de resultado vazio.
 
 Integre à arquitetura existente com mudanças mínimas.
-```
 
-### Prompt 4 — Gráficos genéricos
+### Etapa 4 — Gráficos genéricos
 
-```text
 Implemente a preparação de gráficos genéricos para a Parte 4 do OneWorld.
 
 A biblioteca de visualização deve seguir o que já estiver disponível no projeto; priorize componentes compatíveis com Streamlit.
@@ -447,11 +438,9 @@ Separe a preparação/agregação dos dados da renderização no Streamlit.
 Não adicione métricas ou interpretações automaticamente baseadas no nome das colunas.
 
 Inclua exemplos e testes com datasets de naturezas diferentes.
-```
 
-### Prompt 5 — Testes automatizados
+### Etapa 5 — Testes automatizados
 
-```text
 Crie uma suíte de testes automatizados para o mecanismo genérico de BI do OneWorld.
 
 Utilize pytest se for compatível com o ambiente existente.
@@ -486,11 +475,9 @@ Não adapte os resultados esperados aos resultados produzidos pelo código: use 
 Execute os testes quando possível e relate resultados reais, falhas e correções.
 
 Não modifique módulos de outros integrantes apenas para fazer um teste passar.
-```
 
-### Prompt 6 — Integração final com Streamlit
+### Etapa 6 — Integração final com Streamlit
 
-```text
 Integre os módulos genéricos de BI à interface atual do OneWorld.
 
 ANTES:
@@ -520,11 +507,9 @@ Entregue um fluxo demonstrável usando pelo menos dois datasets de domínios dif
 Verifique a execução do aplicativo e dos testes.
 
 Documente os arquivos modificados, as funcionalidades concluídas e os problemas pendentes.
-```
 
-### Prompt adicional — IA/BYOK (integração da equipe)
+### Etapa adicional — IA/BYOK (integração da equipe)
 
-```text
 Revise a integração opcional de IA/BYOK do OneWorld para garantir que ela seja independente de domínios específicos.
 
 A IA deve receber:
@@ -548,7 +533,6 @@ RESTRIÇÕES:
 Mantenha os provedores BYOK definidos no planejamento, observando a implementação disponível.
 
 Inclua testes com respostas simuladas, sem utilizar chaves reais.
-```
 
 ## 9. Critérios de aceitação
 
@@ -595,13 +579,13 @@ A Casa Grande Eventos pode oferecer dados de validação realistas, mas **o mesm
 
 ## 11. Próximos passos imediatos
 
-1. Suspender prompts anteriores que determinem KPIs de receita, convidados, reservas ou eventos.
-2. Executar **Prompt 0** para definir o contexto de escopo.
-3. Executar **Prompt 1** para auditar o código **sem editar**.
+1. Revisar requisitos anteriores que determinem KPIs de receita, convidados, reservas ou eventos.
+2. Executar **Etapa 0** para definir o contexto de escopo.
+3. Executar **Etapa 1** para auditar o código **sem editar**.
 4. Revisar o diagnóstico antes de aceitar alterações.
-5. Executar **Prompt 2** para substituir os KPIs específicos por operações genéricas.
+5. Executar **Etapa 2** para substituir os KPIs específicos por operações genéricas.
 6. Validar o módulo de KPIs com pelo menos dois datasets diferentes.
-7. Prosseguir com filtros (**Prompt 3**), gráficos (**Prompt 4**), testes (**Prompt 5**) e integração (**Prompt 6**).
+7. Prosseguir com filtros (**Etapa 3**), gráficos (**Etapa 4**), testes (**Etapa 5**) e integração (**Etapa 6**).
 8. Usar o checklist da seção 9 antes de considerar a Parte 4 concluída.
 
 ## 12. Referências internas do projeto

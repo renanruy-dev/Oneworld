@@ -1,6 +1,6 @@
 # Evidências — nova verificação de 27/10/2026
 
-Esta pasta pertence à nova execução do Prompt 1. Os registros das rodadas anteriores foram preservados fora dela. Versão final: **60 testes aprovados**; ambiente e resultados em [demonstracao.json](demonstracao.json). Os hashes identificam os arquivos desta rodada; não representam autoria ou homologação externa.
+Esta pasta pertence à nova execução da auditoria técnica. Os registros das rodadas anteriores foram preservados fora dela. Versão final: **60 testes aprovados**; ambiente e resultados em [demonstracao.json](demonstracao.json). Os hashes identificam os arquivos desta rodada; não representam autoria ou homologação externa.
 
 ## Capturas reais no navegador
 

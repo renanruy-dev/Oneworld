@@ -145,7 +145,7 @@ Não há dependência externa bloqueando os testes e a demonstração local conc
 
 Data da auditoria: **27/10/2026**. A auditoria inicial foi de leitura, sem alteração de código ou banco. **Atualização da Etapa 2, na mesma data:** testes executados, dois defeitos de identidade SQLite corrigidos no frontend de BI e evidências anexadas em [validação técnica](validacao_tecnica.md). Banco e módulos compartilhados preservados.
 
-Base aplicada: contexto mestre (contexto inicial), auditoria (etapa técnica) e critérios do [planejamento v2](../oneworld_planejamento_execucao_v2.md). O OneWorld é BI genérico local; a Casa Grande Eventos é parceira de validação, não domínio obrigatório. Não foi localizado um arquivo separado chamado prompt-base nesta cópia.
+Base aplicada: contexto mestre (contexto inicial), auditoria (etapa técnica) e critérios do [planejamento v2](../oneworld_planejamento_execucao_v2.md). O OneWorld é BI genérico local; a Casa Grande Eventos é parceira de validação, não domínio obrigatório.
 
 ## Como interpretar os estados
 
@@ -165,7 +165,7 @@ Base aplicada: contexto mestre (contexto inicial), auditoria (etapa técnica) e 
 
 | ID | Fonte | Alcance e limite |
 | --- | --- | --- |
-| E1 | [Planejamento v2](../oneworld_planejamento_execucao_v2.md), especialmente seções 8–12 | Escopo, prompts e marcos; planejamento não é implementação concluída. |
+| E1 | [Planejamento v2](../oneworld_planejamento_execucao_v2.md), especialmente seções 8–12 | Escopo, etapas e marcos; planejamento não é implementação concluída. |
 | E2 | [Registro de implementação](../parte4_implementacao.md), incluindo retomada de 27/10 | Relata evolução de 32 para 49 e depois 52 testes aprovados, compilação, health check anterior e inspeção visual. Não há log bruto de execução anexado aos arquivos auditados. |
 | E3 | [Registro da entrega da Parte 4](../entrega_parte4.md) | Síntese técnica e pendências acadêmicas em 27/10; não é recibo de envio nem aceite externo. |
 | E4 | [Indicadores genéricos](../indicadores_genericos.md) e [guia do dashboard](../guia_dashboard.md) | Contratos, resultados esperados e roteiro reproduzível; o guia é da Parte 4, não manual coletivo completo. |

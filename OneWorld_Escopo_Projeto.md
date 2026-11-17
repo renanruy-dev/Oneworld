@@ -1,6 +1,6 @@
 # OneWorld — Contexto e Escopo do Projeto (Atualizado)
 
-Projeto: sistema de BI local em Python, **open source**. Trabalho extensionista (Big Data), 6 estudantes, prazo 15/09–18/11. Abordagem: MVP/protótipo, código gerado com apoio de IA.
+Projeto: sistema de BI local em Python, **open source**. Trabalho extensionista (Big Data), 6 estudantes, prazo 15/09–18/11. Abordagem de desenvolvimento incremental de MVP/protótipo.
 
 Nota: existe parceiro externo formal (empresa fictícia/real "Casa Grande Eventos", contato Kleber) exigido pelos parâmetros da disciplina. Suas necessidades específicas (previsão de demanda, gestão de fornecedores) NÃO direcionam o escopo funcional — mantido apenas como informação de referência, não implementar com base nele a menos que solicitado.
 

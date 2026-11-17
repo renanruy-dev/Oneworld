@@ -50,7 +50,6 @@ Oneworld/
 ├── OneWorld-logo.jpg        # Identidade visual / Logo do projeto
 ├── OneWorld.ico             # Ícone oficial do aplicativo desktop
 ├── requirements.txt         # Dependências do projeto (PyQt6, pandas, openpyxl)
-├── AGENTS.md                # Diretrizes do assistente de código
 ├── .gitignore               # Regras de exclusão do Git
 └── README.md                # Documentação do repositório
 ```

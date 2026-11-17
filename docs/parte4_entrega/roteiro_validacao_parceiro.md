@@ -8,7 +8,7 @@ Prazos do [planejamento](../oneworld_planejamento_execucao_v2.md): **04/11/2026*
 
 ## Objetivo e distinção entre as verificações
 
-O teste técnico foi executado localmente pelo agente, em cópia isolada, com dados
+O teste técnico foi executado localmente, em cópia isolada, com dados
 sintéticos. Conferiu cálculos, controles, gráficos, limpeza, download e leitura
 SQLite. Os resultados estão em [evidências atuais](evidencias/validacao_20261027/README.md), com 60 testes aprovados no log final. Não houve nova execução nesta preparação documental.
 

@@ -2,12 +2,12 @@
 
 **Data de consolidação:** 07/10/2026  
 **Projeto:** OneWorld  
-**Natureza:** documento de contexto para futuras IAs e pessoas que continuarem o projeto  
+**Natureza:** documento de contexto para a continuidade do projeto
 **Status:** referência consolidada; não é uma especificação de implementação concluída nem um documento acadêmico final
 
 ## 1. Autoridade e finalidade
 
-Este arquivo reúne, em uma única referência autossuficiente, o propósito do OneWorld, as decisões confirmadas, os limites do MVP, os fluxos previstos, as condicionais e as pendências reais. Seu objetivo é evitar que futuras IAs tratem sugestões antigas, protótipos demonstrativos ou afirmações não validadas como requisitos aprovados.
+Este arquivo reúne, em uma única referência autossuficiente, o propósito do OneWorld, as decisões confirmadas, os limites do MVP, os fluxos previstos, as condicionais e as pendências reais. Seu objetivo é distinguir os requisitos aprovados de sugestões antigas, protótipos demonstrativos e afirmações não validadas.
 
 ### Hierarquia para resolver conflitos
 
@@ -18,7 +18,7 @@ Este arquivo reúne, em uma única referência autossuficiente, o propósito do 
 
 Quando uma fonte antiga divergir deste arquivo, a decisão mais recente e explícita do usuário prevalece. A conclusão e o futuro apresentados nos slides devem ser lidos como evolução possível, não como compromisso adicional do MVP.
 
-### Regras gerais para futuras IAs
+### Regras gerais de continuidade
 
 - Não transformar uma sugestão em requisito sem confirmação do usuário.
 - Não afirmar que uma funcionalidade está implementada apenas porque aparece no protótipo, nos slides ou em um PDF.
@@ -307,7 +307,7 @@ Inspeção, busca e resumo somente leitura não exigem confirmação. Nesta cons
 
 ## 16. Regra final de continuidade
 
-Antes de implementar, escrever outro documento, alterar um requisito ou responder a uma nova solicitação sobre o OneWorld, a futura IA deve:
+A continuidade do OneWorld deve seguir os procedimentos abaixo.
 
 1. consultar este arquivo;
 2. verificar se a solicitação é confirmada, condicional, pendente ou fora do MVP;

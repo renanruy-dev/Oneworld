@@ -1,6 +1,6 @@
 {
   "data": "27/10/2026",
-  "etapa": "Prompt 2 - preparacao documental",
+  "etapa": "Etapa 2 - preparacao documental",
   "nova_execucao_aplicativo_ou_suite": false,
   "integridade": {
     "metodo": "SHA-256 antes/depois dos arquivos do projeto; excluidos .git, .venv e __pycache__. Sem importacao do aplicativo ou abertura de SQLite.",

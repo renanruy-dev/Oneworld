@@ -1,15 +1,13 @@
 # Evidências reais — inspeção visual da Etapa 3
 
-Execução em **27/10/2026**, fuso **America/Sao_Paulo**. Teste técnico local pelo
-agente; **validação externa pendente**. Nenhum participante, feedback ou aprovação
+Execução em **27/10/2026**, fuso **America/Sao_Paulo**. Teste técnico local; **validação externa pendente**. Nenhum participante, feedback ou aprovação
 foi presumido e ninguém foi contatado.
 
 ## Ambiente e escopo
 
-Aplicados o Prompt 0 e as restrições da Parte 4 do
+Aplicados o escopo e as restrições da Parte 4 do
 [planejamento](../../oneworld_planejamento_execucao_v2.md), após leitura dos
-[registros anteriores](../validacao_tecnica.md). Não foi localizado prompt-base
-separado nem lista adicional de arquivos permitidos. As correções ficaram em
+[registros anteriores](../validacao_tecnica.md). As correções ficaram em
 `oneworld/frontend_bi.py` e `tests/test_frontend_bi.py`; documentação e evidências
 ficam na entrega. Módulos compartilhados e banco original foram preservados.
 

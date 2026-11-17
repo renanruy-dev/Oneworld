@@ -4,7 +4,7 @@ Preparado em **27/10/2026**, referência America/Sao_Paulo. **Material técnico 
 
 ## Base e alcance deste texto
 
-Este documento reúne evidências existentes para incorporação ao relatório coletivo. Aplica o contexto mestre (contexto inicial), os contratos e as restrições do [planejamento v2](../oneworld_planejamento_execucao_v2.md), identificado nas etapas anteriores como a base disponível. Não foi localizado um arquivo separado chamado prompt-base. O princípio aplicado é: o usuário fornece os dados e configura a análise; o OneWorld oferece operações analíticas sem pressupor o contexto de negócio.
+Este documento reúne evidências existentes para incorporação ao relatório coletivo. Aplica o contexto mestre (contexto inicial), os contratos e as restrições do [planejamento v2](../oneworld_planejamento_execucao_v2.md), identificado nas etapas anteriores como a base disponível. O princípio aplicado é: o usuário fornece os dados e configura a análise; o OneWorld oferece operações analíticas sem pressupor o contexto de negócio.
 
 Foram consultados o código atual, os exemplos, o [checklist](checklist.md), a [validação técnica atual](validacao_tecnica.md), os [registros da rodada final de 27/10/2026](evidencias/validacao_20261027/README.md), seus logs e manifestos. Os resultados de execução abaixo pertencem às rodadas identificadas nesses registros; nesta preparação de materiais (etapa documental) foi feita consolidação documental, sem nova execução da aplicação ou da suíte. Os DOCX originais não foram alterados e nenhuma entrega foi enviada.
 
