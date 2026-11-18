@@ -101,6 +101,20 @@ def excluir(tab, id_):
     executar(f"DELETE FROM {tab} WHERE id=?", (int(id_),))
 
 
+def excluir_lote(tab, ids):
+    """Exclui vários registros de uma tabela em uma única transação."""
+    lista = [(int(i),) for i in ids]
+    if not lista:
+        return 0
+    con = sqlite3.connect(DB_PATH)
+    try:
+        cur = con.executemany(f"DELETE FROM {tab} WHERE id=?", lista)
+        con.commit()
+        return cur.rowcount
+    finally:
+        con.close()
+
+
 def renomear_evento_nos_convidados(novo, antigo):
     executar("UPDATE convidados SET evento=? WHERE evento=?", (novo, antigo))
 

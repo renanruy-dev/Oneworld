@@ -64,3 +64,21 @@ def test_config_persistida():
     db.cfg_gravar("teste_chave", {"ativo": True, "limite": 50})
     lido = db.cfg_ler("teste_chave", {})
     assert lido == {"ativo": True, "limite": 50}
+
+
+def test_excluir_lote():
+    db.inserir_lote(
+        "eventos",
+        [
+            {"data": "2026-11-10", "cliente": "Op 1", "local": "A", "convidados": 1, "valor": 100.0, "status": "Pendente"},
+            {"data": "2026-11-11", "cliente": "Op 2", "local": "B", "convidados": 2, "valor": 200.0, "status": "Pendente"},
+            {"data": "2026-11-12", "cliente": "Op 3", "local": "C", "convidados": 3, "valor": 300.0, "status": "Pendente"},
+        ],
+    )
+    df = db.carregar("eventos")
+    ids = [int(df.iloc[0]["id"]), int(df.iloc[2]["id"])]
+    removidos = db.excluir_lote("eventos", ids)
+    assert removidos == 2
+    restante = db.carregar("eventos")
+    assert len(restante) == 1
+    assert restante.iloc[0]["cliente"] == "Op 2"

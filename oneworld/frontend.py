@@ -31,6 +31,8 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMainWindow,
     QMessageBox,
     QPlainTextEdit,
@@ -1448,43 +1450,8 @@ class OneWorldWindow(QMainWindow):
 
     # ── PÁGINA 1: DASHBOARD ──
     def pagina_dashboard(self):
-        v = self.vocab()
-        self._cabecalho("Dashboard", "Visão consolidada do negócio e explorador analítico de dados (BI)")
-
-        abas = QTabWidget()
-
-        # Aba 1 (Padrão): Visão Geral (Negócio)
-        w_negocio = QWidget()
-        lay_neg = QVBoxLayout(w_negocio)
-        lay_neg.setContentsMargins(16, 16, 16, 16)
-        lay_neg.setSpacing(16)
-        self._montar_dashboard_negocio(lay_neg)
-        abas.addTab(w_negocio, "🏢 Visão Geral (Negócio)")
-
-        # Aba 2: Dashboard BI Genérico (inicia limpo, sem CSVs estáticos de exemplo)
-        w_bi = QWidget()
-        lay_bi = QVBoxLayout(w_bi)
-        lay_bi.setContentsMargins(16, 16, 16, 16)
-        lay_bi.setSpacing(14)
-        from .frontend_bi import BIDashboardWidget
-
-        self.bi_widget = BIDashboardWidget(self.cfg, parent=self, carregar_exemplos=False)
-        lay_bi.addWidget(self.bi_widget)
-        abas.addTab(w_bi, "📈 Explorador BI (Tabelas & Arquivos)")
-
-        aba_idx = self.estado.get("dash_aba_ativa", 0)
-        abas.setCurrentIndex(aba_idx)
-
-        def ao_mudar_aba(idx: int):
-            self.estado["dash_aba_ativa"] = idx
-            if idx == 0 and hasattr(self, "cvm_painel_negocio"):
-                self.cvm_painel_negocio.atualizar()
-            elif idx == 1 and hasattr(self, "bi_widget"):
-                self.bi_widget.atualizar_comparacao_cvm()
-
-        abas.currentChanged.connect(ao_mudar_aba)
-
-        self.lay_pagina.addWidget(abas)
+        self._cabecalho("Dashboard", "Visão consolidada dos dados, finanças e indicadores do negócio")
+        self._montar_dashboard_negocio(self.lay_pagina)
 
     def _montar_dashboard_negocio(self, container_lay: QVBoxLayout):
         v = self.vocab()
@@ -1933,6 +1900,14 @@ class OneWorldWindow(QMainWindow):
 
             cb_sel.currentIndexChanged.connect(lambda _: montar_edicao_evento())
             montar_edicao_evento()
+            l_ed.addWidget(Divider())
+            l_ed.addWidget(
+                self._bloco_excluir_lote(
+                    "eventos",
+                    e,
+                    lambda r: f"#{r.id} · {bk.fmt_data(r.data)} · {r.cliente}",
+                )
+            )
             l_ed.addStretch(1)
 
         abas.addTab(w_ed, "Editar / excluir")
@@ -2022,6 +1997,93 @@ class OneWorldWindow(QMainWindow):
         lay.addWidget(chk)
         lay.addWidget(btn, alignment=Qt.AlignmentFlag.AlignLeft)
         return w
+
+    def _bloco_excluir_lote(self, tab: str, df: pd.DataFrame, rotulo_fn) -> QWidget:
+        """Exclusão em lote com filtro, seleção múltipla e botão 'Selecionar todos'."""
+        card = QFrame()
+        card.setObjectName("OwCard")
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(14, 12, 14, 12)
+        lay.setSpacing(8)
+        lay.addWidget(self._subtitulo("Exclusão em lote (selecionar vários ou todos)"))
+
+        barra = QHBoxLayout()
+        barra.setSpacing(8)
+        ed_filtro = QLineEdit()
+        ed_filtro.setPlaceholderText("Filtrar registros para seleção em lote...")
+        barra.addWidget(ed_filtro, stretch=1)
+
+        btn_todos = QPushButton("Selecionar todos")
+        btn_todos.setCursor(Qt.CursorShape.PointingHandCursor)
+        barra.addWidget(btn_todos)
+
+        btn_nenhum = QPushButton("Desmarcar todos")
+        btn_nenhum.setCursor(Qt.CursorShape.PointingHandCursor)
+        barra.addWidget(btn_nenhum)
+        lay.addLayout(barra)
+
+        lista = QListWidget()
+        lista.setMaximumHeight(190)
+        for r in df.itertuples():
+            item = QListWidgetItem(rotulo_fn(r))
+            item.setData(Qt.ItemDataRole.UserRole, int(r.id))
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Unchecked)
+            lista.addItem(item)
+        lay.addWidget(lista)
+
+        chk_conf = QCheckBox("Confirmo a exclusão dos 0 registro(s) selecionado(s)")
+        btn_exc = QPushButton("Excluir selecionados")
+        btn_exc.setEnabled(False)
+        btn_exc.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        def ids_marcados() -> list[int]:
+            return [
+                int(lista.item(i).data(Qt.ItemDataRole.UserRole))
+                for i in range(lista.count())
+                if lista.item(i).checkState() == Qt.CheckState.Checked
+            ]
+
+        def atualizar_estado_lote():
+            n = len(ids_marcados())
+            chk_conf.setText(f"Confirmo a exclusão dos {n} registro(s) selecionado(s)")
+            btn_exc.setEnabled(n > 0 and chk_conf.isChecked())
+
+        def filtrar_itens():
+            termo = bk.sem_acento(ed_filtro.text())
+            for i in range(lista.count()):
+                it = lista.item(i)
+                it.setHidden(bool(termo) and termo not in bk.sem_acento(it.text()))
+
+        def marcar_visiveis(marcar: bool):
+            lista.blockSignals(True)
+            estado = Qt.CheckState.Checked if marcar else Qt.CheckState.Unchecked
+            for i in range(lista.count()):
+                it = lista.item(i)
+                if not it.isHidden():
+                    it.setCheckState(estado)
+            lista.blockSignals(False)
+            atualizar_estado_lote()
+
+        def confirmar_lote():
+            ids = ids_marcados()
+            if not ids:
+                return
+            db.excluir_lote(tab, ids)
+            self.aviso(f"{len(ids)} registro(s) excluído(s) em lote ({tab}).")
+            self.flash(f"{len(ids)} registro(s) excluído(s).")
+            self.reconstruir_pagina()
+
+        ed_filtro.textChanged.connect(filtrar_itens)
+        btn_todos.clicked.connect(lambda: marcar_visiveis(True))
+        btn_nenhum.clicked.connect(lambda: marcar_visiveis(False))
+        lista.itemChanged.connect(lambda _: atualizar_estado_lote())
+        chk_conf.toggled.connect(lambda _: atualizar_estado_lote())
+        btn_exc.clicked.connect(confirmar_lote)
+
+        lay.addWidget(chk_conf)
+        lay.addWidget(btn_exc, alignment=Qt.AlignmentFlag.AlignLeft)
+        return card
 
     # ── ABA SECUNDÁRIA UNIFICADA (GASTOS / DESPESAS / CADASTROS) ──
     def pagina_convidados(self):
@@ -2227,6 +2289,14 @@ class OneWorldWindow(QMainWindow):
 
             cb_sel.currentIndexChanged.connect(lambda _: montar_edicao_conv())
             montar_edicao_conv()
+            l_ed.addWidget(Divider())
+            l_ed.addWidget(
+                self._bloco_excluir_lote(
+                    "convidados",
+                    g,
+                    lambda r: f"#{r.id} · {r.nome} · {r.evento}",
+                )
+            )
             l_ed.addStretch(1)
 
         abas.addTab(w_ed, "Editar / excluir")
@@ -2314,20 +2384,51 @@ class OneWorldWindow(QMainWindow):
             "Dados Externos",
             "Gerenciamento de bases públicas de comparação (CVM) e importação de planilhas",
         )
+        abas = QTabWidget()
+
+        # Aba 1: Bases Públicas CVM (Comparação & Decision Intelligence)
+        w_cvm = QWidget()
+        lay_cvm = QVBoxLayout(w_cvm)
+        lay_cvm.setContentsMargins(16, 16, 16, 16)
+        lay_cvm.setSpacing(12)
         self.cvm_gerenciador = CVMGerenciadorWidget(self)
-        self.lay_pagina.addWidget(self.cvm_gerenciador)
-        self.lay_pagina.addWidget(Divider())
-        self.lay_pagina.addWidget(self._subtitulo("Importação de planilhas para lançamentos do negócio"))
-        self.lay_pagina.addWidget(ImportarPlanilhaWidget(self, destino_fixo=None, chave_estado="impex"))
-        self.lay_pagina.addWidget(Divider())
-        self.lay_pagina.addWidget(self._subtitulo("Histórico"))
+        lay_cvm.addWidget(self.cvm_gerenciador)
+        lay_cvm.addStretch(1)
+        abas.addTab(w_cvm, "📊 Bases CVM (Comparação)")
+
+        # Aba 2: Importar Planilhas para Lançamentos do Negócio
+        w_imp = QWidget()
+        lay_imp = QVBoxLayout(w_imp)
+        lay_imp.setContentsMargins(16, 16, 16, 16)
+        lay_imp.setSpacing(12)
+        lay_imp.addWidget(self._subtitulo("Importação de planilhas para lançamentos do negócio"))
+        lay_imp.addWidget(ImportarPlanilhaWidget(self, destino_fixo=None, chave_estado="impex"))
+        lay_imp.addStretch(1)
+        abas.addTab(w_imp, "📥 Importar Planilhas (Negócio)")
+
+        # Aba 3: Histórico de Importações
+        w_hist = QWidget()
+        lay_hist = QVBoxLayout(w_hist)
+        lay_hist.setContentsMargins(16, 16, 16, 16)
+        lay_hist.setSpacing(12)
+        lay_hist.addWidget(self._subtitulo("Histórico de importações"))
         h = db.historico_arquivos()
         if h.empty:
-            self.lay_pagina.addWidget(AlertBox("Nenhum arquivo recebido.", "info"))
+            lay_hist.addWidget(AlertBox("Nenhum arquivo recebido.", "info"))
         else:
-            self.lay_pagina.addWidget(
+            lay_hist.addWidget(
                 PaginatedTableWidget(h, linhas_por_pagina=self.cfg["linhas"], status_cols=())
             )
+        lay_hist.addStretch(1)
+        abas.addTab(w_hist, "🕒 Histórico")
+
+        aba_idx = self.estado.get("tab_dados_externos", 0)
+        if not 0 <= aba_idx < abas.count():
+            aba_idx = 0
+        abas.setCurrentIndex(aba_idx)
+        abas.currentChanged.connect(lambda idx: self.estado.__setitem__("tab_dados_externos", idx))
+
+        self.lay_pagina.addWidget(abas)
 
     # ── PÁGINA 5: ORIENTAÇÃO IA ──
     def pagina_ia(self):
