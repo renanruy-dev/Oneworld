@@ -475,9 +475,13 @@ class CVMComparacaoPainel(QFrame):
         self.chk_habilitar = QCheckBox(
             "Habilitar comparação com base(s) pública(s) CVM (Decision Intelligence)"
         )
+        self.chk_habilitar.setVisible(False)
         self.chk_habilitar.setCursor(Qt.CursorShape.PointingHandCursor)
         self.chk_habilitar.toggled.connect(self._ao_alternar_ativa)
-        topo.addWidget(self.chk_habilitar)
+
+        self.lbl_titulo = QLabel("📊 Comparação com base(s) pública(s) CVM (Decision Intelligence)")
+        self.lbl_titulo.setStyleSheet("font-weight: 700; font-size: 14px;")
+        topo.addWidget(self.lbl_titulo)
         topo.addStretch(1)
 
         self.lbl_status = QLabel()
@@ -562,6 +566,7 @@ class CVMComparacaoPainel(QFrame):
         self.chk_habilitar.setChecked(ativa)
         self.chk_habilitar.blockSignals(False)
 
+        self.setVisible(ativa)
         self.corpo.setVisible(ativa)
         _limpar_layout_widgets(self.lay_checks)
         self._checks_bases.clear()
@@ -840,6 +845,7 @@ class CVMGerenciadorWidget(QWidget):
         elif not marcado and base_id in sel:
             sel.remove(base_id)
         cvm_cmp.definir_bases_selecionadas(sel)
+        self.recarregar()
 
     def _selecionar_todas(self):
         estado = cvm_cmp.carregar_estado_cvm()
@@ -1207,6 +1213,33 @@ class ImportarPlanilhaWidget(QWidget):
         self.janela.aviso(f"Importação: {len(res['ok'])} registro(s) de {nome_arq} em {nome_dest}")
         self.janela.flash(f"{len(res['ok'])} registro(s) gravados em {nome_dest}.")
         self._limpar_arquivo()
+        self.janela.notificar_alteracao_dados()
+
+
+OPCOES_TIPO_DASHBOARD = [
+    ("📌 Cartão de Indicador (KPI em destaque no Dashboard)", "kpi"),
+    ("📊 Gráfico de Barras (Comparar evolução dos lançamentos)", "grafico"),
+    ("📌 + 📊 Cartão KPI + Gráfico de Barras", "kpi_grafico"),
+    ("📋 Lista / Tabela de Lançamentos no Dashboard", "lista"),
+    ("🚫 Não criar bloco próprio (Apenas somar nos totais)", "nenhum"),
+]
+OPCOES_TIPO_VALOR = [
+    ("💰 Dinheiro (R$)", "dinheiro"),
+    ("🔢 Número / Quantidade", "numero"),
+    ("📝 Texto / Observação", "texto"),
+]
+ROTULOS_TIPO_DASH = {
+    "kpi": "Cartão KPI",
+    "grafico": "Gráfico de Barras",
+    "kpi_grafico": "KPI + Gráfico",
+    "lista": "Lista no Dashboard",
+    "nenhum": "Apenas totais",
+}
+ROTULOS_TIPO_VALOR = {
+    "dinheiro": "Dinheiro (R$)",
+    "numero": "Número",
+    "texto": "Texto",
+}
 
 
 # ── Janela Principal Desktop ──
@@ -1261,7 +1294,7 @@ class OneWorldWindow(QMainWindow):
 
         self.aplicar_tema()
         self.reconstruir_sidebar()
-        self.reconstruir_pagina()
+        self.notificar_alteracao_dados()
 
     # ── Helpers de estado, vocabulário e dados ──
     @staticmethod
@@ -1391,7 +1424,7 @@ class OneWorldWindow(QMainWindow):
                 self.estado.pop(k, None)
         self.pagina_atual = nova_pagina
         self.reconstruir_sidebar()
-        self.reconstruir_pagina()
+        self.notificar_alteracao_dados()
 
     # ── Peças de Página ──
     def _cabecalho(self, titulo_txt: str, subtitulo_txt: str):
@@ -1456,6 +1489,7 @@ class OneWorldWindow(QMainWindow):
     def _montar_dashboard_negocio(self, container_lay: QVBoxLayout):
         v = self.vocab()
         e, cv = self.dados("eventos"), self.dados("convidados")
+        dg = db.carregar_dados_gerais()
 
         # ── 1. Barra Superior: Filtros + Ações Rápidas ──
         card_topo = QFrame()
@@ -1507,12 +1541,12 @@ class OneWorldWindow(QMainWindow):
         btn_nova_op = QPushButton(f"+ {v['ent1_singular']}")
         btn_nova_op.setObjectName("PrimaryBtn")
         btn_nova_op.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_nova_op.clicked.connect(lambda: self._abrir_modulo_financeiro(0))
+        btn_nova_op.clicked.connect(lambda: self._abrir_modulo_financeiro(1, "Receitas"))
         linha_ac.addWidget(btn_nova_op)
 
         btn_novo_gasto = QPushButton(f"+ {v['ent2_singular']}")
         btn_novo_gasto.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_novo_gasto.clicked.connect(lambda: self._abrir_modulo_financeiro(1))
+        btn_novo_gasto.clicked.connect(lambda: self._abrir_modulo_financeiro(1, "Despesas"))
         linha_ac.addWidget(btn_novo_gasto)
 
         btn_imp = QPushButton("Importar Planilha")
@@ -1561,8 +1595,14 @@ class OneWorldWindow(QMainWindow):
         )
         container_lay.addWidget(self.cvm_painel_negocio)
 
+        # ── 2c. Campos & Indicadores configurados em "Adicionar dados" ──
+        self._montar_campos_dashboard_personalizados(container_lay, f, cv, dg)
+
         # ── 3. Estado Vazio Limpo (quando o banco local está sem registros) ──
         if e.empty and cv.empty:
+            if not dg.empty:
+                container_lay.addStretch(1)
+                return
             card_vazio = QFrame()
             card_vazio.setObjectName("EmptyStateCard")
             lay_vazio = QVBoxLayout(card_vazio)
@@ -1589,12 +1629,12 @@ class OneWorldWindow(QMainWindow):
             b1 = QPushButton(f"Cadastrar {v['ent1_singular'].lower()}")
             b1.setObjectName("PrimaryBtn")
             b1.setCursor(Qt.CursorShape.PointingHandCursor)
-            b1.clicked.connect(lambda: self._abrir_modulo_financeiro(0))
+            b1.clicked.connect(lambda: self._abrir_modulo_financeiro(1, "Receitas"))
             linha_bv.addWidget(b1)
 
             b_gasto = QPushButton(f"Lançar {v['ent2_singular'].lower()}")
             b_gasto.setCursor(Qt.CursorShape.PointingHandCursor)
-            b_gasto.clicked.connect(lambda: self._abrir_modulo_financeiro(1))
+            b_gasto.clicked.connect(lambda: self._abrir_modulo_financeiro(1, "Despesas"))
             linha_bv.addWidget(b_gasto)
 
             b2 = QPushButton("Importar planilha externa")
@@ -1689,15 +1729,197 @@ class OneWorldWindow(QMainWindow):
         )
         container_lay.addWidget(card_tab)
 
+    def _coletar_campos_dashboard(self, f_ev: pd.DataFrame, cv: pd.DataFrame, dg: pd.DataFrame) -> list[dict]:
+        """Reúne os campos de Dados Gerais, Receitas e Despesas com configuração de exibição no Dashboard."""
+        metas = db.carregar_metas_campos()
+        campos: list[dict] = []
+        origens = [
+            ("dados_gerais", dg, "titulo", "valor", "data"),
+            ("eventos", f_ev, "cliente", "valor", "data"),
+            ("convidados", cv, "nome", "acompanhantes", ""),
+        ]
+        for origem, df_orig, col_tit, col_val, col_dt in origens:
+            if df_orig.empty:
+                continue
+            for _, row_s in df_orig.iterrows():
+                id_ = int(row_s["id"])
+                chave = f"{origem}:{id_}"
+                # Usa a configuração salva ou padrão; preserva todos os campos configurados pelo usuário
+                meta = db._normalizar_meta_campo(origem, metas.get(chave))
+                if meta["tipo_dashboard"] == "nenhum":
+                    continue
+                campos.append({
+                    "origem": origem,
+                    "id": id_,
+                    "titulo": str(row_s.get(col_tit) or f"Campo #{id_}"),
+                    "valor_base": row_s.get(col_val, ""),
+                    "data_base": str(row_s.get(col_dt) or "") if col_dt else "",
+                    "meta": meta,
+                })
+        return campos
+
+    def _valor_consolidado_campo(self, campo: dict) -> str:
+        meta = campo["meta"]
+        itens = meta["itens"]
+        tv = meta["tipo_valor"]
+        if tv in ("dinheiro", "numero"):
+            if itens:
+                soma = 0.0
+                for it in itens:
+                    try:
+                        soma += bk.parse_valor(it.get("valor"))
+                    except ValueError:
+                        pass
+                return self._fmt_valor_campo(soma, tv)
+            val_b = campo["valor_base"]
+            if str(val_b or "").strip() == "":
+                return "—"
+            return self._fmt_valor_campo(val_b, tv)
+        if itens:
+            return str(itens[-1].get("valor") or "—")
+        return str(campo["valor_base"] or "—")
+
+    def _serie_itens_campo(self, campo: dict) -> tuple[pd.Series, bool]:
+        meta = campo["meta"]
+        itens = meta["itens"]
+        tv = meta["tipo_valor"]
+        pares: list[tuple[str, object]] = []
+        if itens:
+            for idx, it in enumerate(itens, 1):
+                rot = str(it.get("rotulo") or "").strip() or (
+                    bk.fmt_data(it.get("data")) if it.get("data") else f"Item {idx}"
+                )
+                pares.append((rot, it.get("valor")))
+        elif str(campo["valor_base"] or "").strip():
+            pares.append((campo["titulo"], campo["valor_base"]))
+
+        if tv in ("dinheiro", "numero"):
+            nomes: list[str] = []
+            vals: list[float] = []
+            contagem: dict[str, int] = {}
+            for rot, val in pares:
+                try:
+                    num = bk.parse_valor(val)
+                except ValueError:
+                    continue
+                contagem[rot] = contagem.get(rot, 0) + 1
+                nome_unq = rot if contagem[rot] == 1 else f"{rot} ({contagem[rot]})"
+                nomes.append(nome_unq)
+                vals.append(num)
+            return (pd.Series(vals, index=nomes, dtype=float) if nomes else pd.Series(dtype=float)), (tv == "dinheiro")
+
+        textos = [str(val or "").strip() for _, val in pares if str(val or "").strip()]
+        if not textos:
+            return pd.Series(dtype=float), False
+        return pd.Series(textos).value_counts().astype(float), False
+
+    def _montar_campos_dashboard_personalizados(
+        self,
+        container_lay: QVBoxLayout,
+        f_ev: pd.DataFrame,
+        cv: pd.DataFrame,
+        dg: pd.DataFrame,
+    ):
+        campos = self._coletar_campos_dashboard(f_ev, cv, dg)
+        if not campos:
+            return
+
+        kpis = [c for c in campos if c["meta"]["tipo_dashboard"] in ("kpi", "kpi_grafico")]
+        blocos_vis = [c for c in campos if c["meta"]["tipo_dashboard"] in ("grafico", "kpi_grafico", "lista")]
+
+        if kpis:
+            container_lay.addWidget(self._subtitulo("📌 Campos & Indicadores configurados"))
+            grade_kpi = QGridLayout()
+            grade_kpi.setSpacing(12)
+            colunas = 4
+            for col in range(colunas):
+                grade_kpi.setColumnStretch(col, 1)
+            for idx, campo in enumerate(kpis):
+                rot = f"{campo['titulo']} · {campo['meta']['nome_info']}"
+                mc = MetricCard(rot, self._valor_consolidado_campo(campo))
+                mc.setMinimumHeight(80)
+                grade_kpi.addWidget(mc, idx // colunas, idx % colunas)
+            container_lay.addLayout(grade_kpi)
+
+        if blocos_vis:
+            container_lay.addWidget(self._subtitulo("📊 Visualizações & Listas dos Campos"))
+            grade_vis = QGridLayout()
+            grade_vis.setSpacing(14)
+            grade_vis.setColumnStretch(0, 1)
+            grade_vis.setColumnStretch(1, 1)
+
+            cards_vis: list[QFrame] = []
+            for campo in blocos_vis:
+                meta = campo["meta"]
+                td = meta["tipo_dashboard"]
+                if td in ("grafico", "kpi_grafico"):
+                    card_g = QFrame()
+                    card_g.setObjectName("OwCard")
+                    lay_g = QVBoxLayout(card_g)
+                    lay_g.setContentsMargins(16, 14, 16, 14)
+                    lay_g.addWidget(self._subtitulo(f"📊 {campo['titulo']} ({meta['nome_info']})"))
+                    serie, eh_moeda = self._serie_itens_campo(campo)
+                    if serie.empty:
+                        lay_g.addWidget(AlertBox("Sem lançamentos numéricos/válidos para plotar ainda.", "info"))
+                    else:
+                        lay_g.addWidget(BarChartWidget(serie, self.cfg["cor"], self.cfg, eh_moeda))
+                    cards_vis.append(card_g)
+
+                if td == "lista":
+                    card_l = QFrame()
+                    card_l.setObjectName("OwCard")
+                    lay_l = QVBoxLayout(card_l)
+                    lay_l.setContentsMargins(16, 14, 16, 14)
+                    lay_l.addWidget(self._subtitulo(f"📋 {campo['titulo']} — {meta['nome_info']}"))
+                    linhas = []
+                    if meta["itens"]:
+                        for idx_it, it in enumerate(meta["itens"], 1):
+                            linhas.append({
+                                "Referência": str(it.get("rotulo") or f"Lançamento #{idx_it}"),
+                                "Data": bk.fmt_data(it.get("data")) if it.get("data") else "—",
+                                meta["nome_info"]: self._fmt_valor_campo(it.get("valor"), meta["tipo_valor"]),
+                            })
+                    elif str(campo["valor_base"] or "").strip():
+                        linhas.append({
+                            "Referência": "Valor atual",
+                            "Data": bk.fmt_data(campo["data_base"]) if campo["data_base"] else "—",
+                            meta["nome_info"]: self._fmt_valor_campo(campo["valor_base"], meta["tipo_valor"]),
+                        })
+                    if linhas:
+                        lay_l.addWidget(PaginatedTableWidget(pd.DataFrame(linhas), linhas_por_pagina=5, status_cols=()))
+                    else:
+                        lay_l.addWidget(AlertBox("Nenhum lançamento adicionado ainda. Use '+ Adicionar dados' no card.", "info"))
+                    cards_vis.append(card_l)
+
+            for idx, card_v in enumerate(cards_vis):
+                grade_vis.addWidget(card_v, idx // 2, idx % 2)
+            container_lay.addLayout(grade_vis)
+
+    def notificar_alteracao_dados(self):
+        """Sincroniza filtros/painel do Dashboard e reconstrói a visualização após inserção, edição ou remoção."""
+        mes_sel = self.estado.get("dash_mes", "Todos")
+        if mes_sel != "Todos":
+            meses_val = bk.meses_disponiveis(self.dados("eventos"))
+            if mes_sel not in meses_val:
+                self.estado["dash_mes"] = "Todos"
+        if hasattr(self, "cvm_painel_negocio") and self.cvm_painel_negocio is not None:
+            try:
+                self.cvm_painel_negocio.atualizar()
+            except RuntimeError:
+                self.cvm_painel_negocio = None
+        self.reconstruir_pagina()
+
     def _definir_filtro(self, chave: str, valor):
         self.estado[chave] = valor
         self.reconstruir_pagina()
 
-    def _abrir_modulo_financeiro(self, aba_idx: int):
+    def _abrir_modulo_financeiro(self, aba_idx: int, categoria_fin: str | None = None):
         self.estado["tab_modulo_fin"] = aba_idx
+        if categoria_fin is not None:
+            self.estado["fin_cat"] = categoria_fin
         self.navegar_para("Eventos")
 
-    # ── PÁGINA 2: MÓDULO UNIFICADO (RECEITAS/OPERAÇÕES + GASTOS/DESPESAS) ──
+    # ── PÁGINA 2: MÓDULO UNIFICADO (DADOS GERAIS + DADOS FINANCEIROS) ──
     def pagina_eventos(self):
         v = self.vocab()
         self._cabecalho(v["menu_ent1"], v["ent1_subtitulo"])
@@ -1706,19 +1928,19 @@ class OneWorldWindow(QMainWindow):
 
         abas_mod = QTabWidget()
 
-        w_ev = QWidget()
-        lay_ev = QVBoxLayout(w_ev)
-        lay_ev.setContentsMargins(12, 12, 12, 12)
-        lay_ev.setSpacing(10)
-        self._montar_aba_eventos(lay_ev, e)
-        abas_mod.addTab(w_ev, f"💰 {v['ent1_plural']} (Entradas)")
+        w_dg = QWidget()
+        lay_dg = QVBoxLayout(w_dg)
+        lay_dg.setContentsMargins(12, 12, 12, 12)
+        lay_dg.setSpacing(10)
+        self._montar_aba_dados_gerais(lay_dg)
+        abas_mod.addTab(w_dg, "📋 Dados Gerais")
 
-        w_cv = QWidget()
-        lay_cv = QVBoxLayout(w_cv)
-        lay_cv.setContentsMargins(12, 12, 12, 12)
-        lay_cv.setSpacing(10)
-        self._montar_aba_convidados(lay_cv)
-        abas_mod.addTab(w_cv, f"📉 {v['ent2_plural']} (Saídas & Custos)")
+        w_fin = QWidget()
+        lay_fin = QVBoxLayout(w_fin)
+        lay_fin.setContentsMargins(12, 12, 12, 12)
+        lay_fin.setSpacing(10)
+        self._montar_aba_dados_financeiros(lay_fin, e)
+        abas_mod.addTab(w_fin, "💰 Dados Financeiros")
 
         idx_mod = self.estado.get("tab_modulo_fin", 0)
         if idx_mod not in (0, 1):
@@ -1727,193 +1949,615 @@ class OneWorldWindow(QMainWindow):
         abas_mod.currentChanged.connect(lambda idx: self.estado.__setitem__("tab_modulo_fin", idx))
         self.lay_pagina.addWidget(abas_mod)
 
-    def _montar_aba_eventos(self, container_lay: QVBoxLayout, e: pd.DataFrame):
-        v = self.vocab()
-        abas = QTabWidget()
-
-        # Aba 1: Listagem
-        w_lista = QWidget()
-        l_lista = QVBoxLayout(w_lista)
-        l_lista.setContentsMargins(16, 16, 16, 16)
-        l_lista.setSpacing(12)
-
-        barra_f = QHBoxLayout()
-        barra_f.setSpacing(16)
-
-        c1 = QVBoxLayout()
-        c1.addWidget(QLabel(f"Buscar em {v['ent1_plural'].lower()}"))
-        ed_busca = QLineEdit(self.estado.get("ev_busca", ""))
-        ed_busca.setPlaceholderText("Digite para filtrar...")
-        c1.addWidget(ed_busca)
-        barra_f.addLayout(c1, stretch=1)
-
-        c2 = QVBoxLayout()
-        c2.addWidget(QLabel(f"Filtrar {v['rotulos']['status'].lower()}"))
-        ms_stat = MultiSelectChips(STATUS_EVENTO, self.estado.get("ev_status", []), self.cfg["cor"])
-        c2.addWidget(ms_stat)
-        barra_f.addLayout(c2, stretch=2)
-        l_lista.addLayout(barra_f)
-
-        container_tab = QWidget()
-        lay_tab = QVBoxLayout(container_tab)
-        lay_tab.setContentsMargins(0, 0, 0, 0)
-        l_lista.addWidget(container_tab)
-
-        btn_csv = QPushButton("Exportar CSV")
-        btn_csv.setCursor(Qt.CursorShape.PointingHandCursor)
-        l_lista.addWidget(btn_csv, alignment=Qt.AlignmentFlag.AlignLeft)
-        l_lista.addStretch(1)
-
-        def atualizar_lista_eventos():
-            self._limpar_layout(lay_tab)
-            busca = ed_busca.text().strip()
-            status = ms_stat.valores()
-            self.estado["ev_busca"] = busca
-            self.estado["ev_status"] = status
-            df_f = e.copy()
-            if busca:
-                df_f = df_f[
-                    df_f.astype(str).apply(lambda col: col.str.contains(busca, case=False, na=False)).any(axis=1)
-                ]
-            if status:
-                df_f = df_f[df_f["status"].isin(status)]
-            lay_tab.addWidget(
-                PaginatedTableWidget(
-                    self.formatar(df_f, "eventos"),
-                    linhas_por_pagina=self.cfg["linhas"],
-                    pagina_inicial=self.estado.get("pg_eventos", 1),
-                    ao_mudar_pagina=lambda pg: self.estado.__setitem__("pg_eventos", pg),
-                )
-            )
-            try:
-                btn_csv.clicked.disconnect()
-            except Exception:
-                pass
-            nome_csv = f"{bk.chave(v['ent1_plural']) or 'operacoes'}.csv"
-            btn_csv.clicked.connect(lambda: self._exportar_csv_dialogo(df_f, nome_csv))
-
-        ed_busca.textChanged.connect(lambda _: atualizar_lista_eventos())
-        ms_stat.changed.connect(lambda _: atualizar_lista_eventos())
-        atualizar_lista_eventos()
-        abas.addTab(w_lista, v["ent1_plural"])
-
-        # Aba 2: + Novo registro
-        w_novo = QWidget()
-        l_novo = QVBoxLayout(w_novo)
-        l_novo.setContentsMargins(16, 16, 16, 16)
-        l_novo.setSpacing(12)
-
-        form_ne, ler_ne = self._montar_form_evento(None)
-        l_novo.addLayout(form_ne)
-        lbl_erro_ne = QLabel()
-        lbl_erro_ne.setStyleSheet("color: #8F2412; font-weight: 600;")
-        lbl_erro_ne.setVisible(False)
-        l_novo.addWidget(lbl_erro_ne)
-
-        btn_cad = QPushButton("Cadastrar")
-        btn_cad.setObjectName("PrimaryBtn")
-        btn_cad.setCursor(Qt.CursorShape.PointingHandCursor)
-
-        def salvar_novo_evento():
-            dd, extras = ler_ne()
-            if not dd["cliente"]:
-                lbl_erro_ne.setText(f"Informe o campo '{v['rotulos']['cliente']}'.")
-                lbl_erro_ne.setVisible(True)
-                return
-            db.inserir_lote("eventos", [dd], extras)
-            self.aviso(f"Novo registro ({v['ent1_singular']}): {dd['cliente']}")
-            self.flash(f"{v['ent1_singular']} cadastrado(a) com sucesso.")
-            self.reconstruir_pagina()
-
-        btn_cad.clicked.connect(salvar_novo_evento)
-        l_novo.addWidget(btn_cad, alignment=Qt.AlignmentFlag.AlignLeft)
-        l_novo.addStretch(1)
-        abas.addTab(w_novo, f"+ Adicionar {v['ent1_singular']}")
-
-        # Aba 3: Editar / excluir
-        w_ed = QWidget()
-        l_ed = QVBoxLayout(w_ed)
-        l_ed.setContentsMargins(16, 16, 16, 16)
-        l_ed.setSpacing(12)
-
-        if e.empty:
-            l_ed.addWidget(AlertBox(f"Nenhum registro em {v['ent1_plural'].lower()}.", "info"))
+    def _badge_status(self, texto: str) -> QLabel:
+        lbl = QLabel(texto or "—")
+        chave = (texto or "").strip().lower()
+        if any(k in chave for k in ("conclu", "confirm", "quitad", "pago", "receita")):
+            bg, fg, bd = "rgba(155, 197, 61, 0.16)", "#9BC53D", "rgba(155, 197, 61, 0.45)"
+        elif any(k in chave for k in ("cancel", "recus", "despesa", "gasto")):
+            bg, fg, bd = "rgba(229, 83, 75, 0.16)", "#E5534B", "rgba(229, 83, 75, 0.45)"
+        elif any(k in chave for k in ("pend", "planej")):
+            bg, fg, bd = "rgba(240, 173, 78, 0.16)", "#E6A23C", "rgba(240, 173, 78, 0.45)"
         else:
-            l_ed.addWidget(QLabel(f"Escolha o registro ({v['ent1_singular']})"))
-            cb_sel = QComboBox()
-            ids = []
-            for r in e.itertuples():
-                ids.append(int(r.id))
-                cb_sel.addItem(f"#{r.id} · {bk.fmt_data(r.data)} · {r.cliente}", userData=int(r.id))
-            sel_atual = self.estado.get("ev_sel", ids[0])
-            if sel_atual in ids:
-                cb_sel.setCurrentIndex(ids.index(sel_atual))
-            l_ed.addWidget(cb_sel)
+            bg, fg, bd = "rgba(91, 79, 196, 0.16)", "#8C82E8", "rgba(91, 79, 196, 0.45)"
+        lbl.setStyleSheet(
+            f"background: {bg}; color: {fg}; border: 1px solid {bd}; "
+            "border-radius: 10px; padding: 2px 10px; font-size: 12px; font-weight: 600;"
+        )
+        lbl.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+        return lbl
 
-            area_ed = QWidget()
-            lay_area_ed = QVBoxLayout(area_ed)
-            lay_area_ed.setContentsMargins(0, 0, 0, 0)
-            lay_area_ed.setSpacing(10)
-            l_ed.addWidget(area_ed)
+    def _criar_card_registro(
+        self,
+        titulo: str,
+        status: str,
+        campos: list[tuple[str, str, bool]],
+        ao_editar,
+        ao_excluir,
+        ao_adicionar_dados=None,
+        resumo_itens: list[str] | None = None,
+    ) -> QFrame:
+        card = QFrame()
+        card.setObjectName("OwCard")
+        card.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(16, 14, 16, 14)
+        lay.setSpacing(10)
 
-            def montar_edicao_evento():
-                self._limpar_layout(lay_area_ed)
-                id_sel = cb_sel.currentData()
-                self.estado["ev_sel"] = id_sel
-                row = e[e["id"] == id_sel].iloc[0].to_dict()
-                form_ee, ler_ee = self._montar_form_evento(row)
-                lay_area_ed.addLayout(form_ee)
+        cab = QHBoxLayout()
+        cab.setSpacing(8)
+        lbl_tit = QLabel(titulo or "—")
+        lbl_tit.setWordWrap(True)
+        lbl_tit.setStyleSheet("font-size: 15px; font-weight: 700;")
+        cab.addWidget(lbl_tit, stretch=1)
+        cab.addWidget(self._badge_status(status), alignment=Qt.AlignmentFlag.AlignTop)
+        lay.addLayout(cab)
 
-                lbl_err = QLabel()
-                lbl_err.setStyleSheet("color: #8F2412; font-weight: 600;")
-                lbl_err.setVisible(False)
-                lay_area_ed.addWidget(lbl_err)
+        lay.addWidget(Divider())
 
-                btn_salvar = QPushButton("Salvar alterações")
-                btn_salvar.setObjectName("PrimaryBtn")
-                btn_salvar.setCursor(Qt.CursorShape.PointingHandCursor)
+        grade = QGridLayout()
+        grade.setHorizontalSpacing(14)
+        grade.setVerticalSpacing(6)
+        grade.setColumnStretch(0, 1)
+        grade.setColumnStretch(1, 1)
+        for idx, (rotulo, valor, destaque) in enumerate(campos):
+            bloco = QVBoxLayout()
+            bloco.setSpacing(2)
+            lbl_r = QLabel(rotulo)
+            lbl_r.setObjectName("Caption")
+            lbl_v = QLabel(valor or "—")
+            lbl_v.setWordWrap(True)
+            if destaque:
+                lbl_v.setStyleSheet("font-size: 14px; font-weight: 700;")
+            bloco.addWidget(lbl_r)
+            bloco.addWidget(lbl_v)
+            grade.addLayout(bloco, idx // 2, idx % 2)
+        lay.addLayout(grade)
 
-                def confirmar_edicao():
-                    dd, extras = ler_ee()
-                    if not dd["cliente"]:
-                        lbl_err.setText(f"Informe o campo '{v['rotulos']['cliente']}'.")
-                        lbl_err.setVisible(True)
-                        return
-                    db.atualizar("eventos", id_sel, dd, extras)
-                    if dd["cliente"] != row["cliente"]:
-                        db.renomear_evento_nos_convidados(dd["cliente"], row["cliente"])
-                    self.aviso(f"{v['ent1_singular']} atualizado(a): {dd['cliente']}")
-                    self.flash("Registro atualizado.")
-                    self.reconstruir_pagina()
+        if resumo_itens:
+            bloco_itens = QWidget()
+            lay_it = QVBoxLayout(bloco_itens)
+            lay_it.setContentsMargins(0, 4, 0, 0)
+            lay_it.setSpacing(2)
+            lbl_cap = QLabel(f"Lançamentos adicionados ({len(resumo_itens)}):")
+            lbl_cap.setObjectName("Caption")
+            lay_it.addWidget(lbl_cap)
+            for linha_it in resumo_itens[-4:]:
+                lbl_it = QLabel(linha_it)
+                lbl_it.setWordWrap(True)
+                lay_it.addWidget(lbl_it)
+            if len(resumo_itens) > 4:
+                lbl_mais = QLabel(f"+ {len(resumo_itens) - 4} lançamento(s) anterior(es)...")
+                lbl_mais.setObjectName("Caption")
+                lay_it.addWidget(lbl_mais)
+            lay.addWidget(bloco_itens)
 
-                btn_salvar.clicked.connect(confirmar_edicao)
-                lay_area_ed.addWidget(btn_salvar, alignment=Qt.AlignmentFlag.AlignLeft)
-                lay_area_ed.addWidget(Divider())
+        acoes = QHBoxLayout()
+        acoes.setSpacing(8)
+        if ao_adicionar_dados is not None:
+            btn_add = QPushButton("+ Adicionar dados")
+            btn_add.setObjectName("PrimaryBtn")
+            btn_add.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_add.clicked.connect(ao_adicionar_dados)
+            acoes.addWidget(btn_add)
+        acoes.addStretch(1)
+        btn_ed = QPushButton("Editar")
+        btn_ed.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_ed.clicked.connect(ao_editar)
+        btn_ex = QPushButton("Excluir")
+        btn_ex.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_ex.clicked.connect(ao_excluir)
+        acoes.addWidget(btn_ed)
+        acoes.addWidget(btn_ex)
+        lay.addLayout(acoes)
+        return card
 
-                vinc = db.contar_convidados_do_evento(row["cliente"])
-                aviso_vinc = (
-                    f"{vinc} registro(s) em '{v['ent2_plural']}' estão vinculados a este item e continuarão cadastrados."
-                    if vinc
-                    else ""
-                )
-                lay_area_ed.addWidget(self._bloco_excluir("eventos", id_sel, row["cliente"], aviso_vinc))
+    def _fmt_valor_campo(self, valor, tipo_valor: str) -> str:
+        if tipo_valor == "dinheiro":
+            try:
+                num = bk.parse_valor(valor)
+            except ValueError:
+                return str(valor or "—")
+            return self.moeda(num)
+        if tipo_valor == "numero":
+            try:
+                num = bk.parse_valor(valor)
+            except ValueError:
+                return str(valor or "—")
+            return str(int(num)) if num == int(num) else f"{num:g}"
+        return str(valor or "—")
 
-            cb_sel.currentIndexChanged.connect(lambda _: montar_edicao_evento())
-            montar_edicao_evento()
-            l_ed.addWidget(Divider())
-            l_ed.addWidget(
-                self._bloco_excluir_lote(
-                    "eventos",
-                    e,
-                    lambda r: f"#{r.id} · {bk.fmt_data(r.data)} · {r.cliente}",
-                )
+    def _meta_e_resumo_card(self, origem: str, row: dict) -> tuple[dict | None, list[str]]:
+        if row.get("id") is None:
+            return None, []
+        meta = db.obter_meta_campo(origem, int(row["id"]))
+        resumo: list[str] = []
+        for idx, it in enumerate(meta["itens"], 1):
+            rot = str(it.get("rotulo") or "").strip() or f"Lançamento #{idx}"
+            dt = bk.fmt_data(it.get("data")) if it.get("data") else ""
+            prefixo = f"{rot} ({dt})" if dt else rot
+            val_fmt = self._fmt_valor_campo(it.get("valor"), meta["tipo_valor"])
+            resumo.append(f"• {prefixo}: {val_fmt}")
+        return meta, resumo
+
+    def _montar_secao_config_campo(
+        self,
+        form: QFormLayout,
+        origem: str,
+        id_registro: int | None,
+        nome_info_padrao: str,
+        tipo_valor_padrao: str,
+    ):
+        meta_atual = (
+            db.obter_meta_campo(origem, int(id_registro))
+            if id_registro is not None
+            else {"tipo_dashboard": "kpi", "nome_info": nome_info_padrao, "tipo_valor": tipo_valor_padrao}
+        )
+
+        lbl_sec = QLabel("📊 Como este campo funciona no Dashboard e recebe dados")
+        lbl_sec.setStyleSheet("font-weight: 700; margin-top: 6px;")
+        form.addRow(lbl_sec)
+
+        cb_dash = QComboBox()
+        for rot, val in OPCOES_TIPO_DASHBOARD:
+            cb_dash.addItem(rot, val)
+        idx_d = cb_dash.findData(meta_atual["tipo_dashboard"])
+        if idx_d >= 0:
+            cb_dash.setCurrentIndex(idx_d)
+
+        ed_info = QLineEdit(meta_atual["nome_info"] or nome_info_padrao)
+        ed_info.setPlaceholderText("Ex.: Quantidade vendida, Valor faturado, Cliente...")
+
+        cb_val = QComboBox()
+        for rot, val in OPCOES_TIPO_VALOR:
+            cb_val.addItem(rot, val)
+        idx_v = cb_val.findData(meta_atual["tipo_valor"])
+        if idx_v >= 0:
+            cb_val.setCurrentIndex(idx_v)
+
+        lbl_exp = QLabel()
+        lbl_exp.setWordWrap(True)
+        lbl_exp.setObjectName("Caption")
+
+        def atualizar_explicacao():
+            td = cb_dash.currentData() or "kpi"
+            ni = ed_info.text().strip() or nome_info_padrao
+            tv = cb_val.currentData() or tipo_valor_padrao
+            desc_dash = {
+                "kpi": "aparecerá como um Cartão de Indicador (KPI) no Dashboard inicial",
+                "grafico": "aparecerá como um Gráfico de Barras no Dashboard inicial",
+                "kpi_grafico": "aparecerá como Cartão de Indicador (KPI) e Gráfico de Barras no Dashboard",
+                "lista": "aparecerá como uma Lista / Tabela de Lançamentos no Dashboard",
+                "nenhum": "não criará bloco próprio no Dashboard (segue apenas nos totais gerais)",
+            }.get(td, "aparecerá no Dashboard inicial")
+            lbl_exp.setText(
+                f"Explicação: No Dashboard, este campo {desc_dash}. "
+                f"No card deste campo em 'Adicionar dados', haverá o botão '+ Adicionar dados' "
+                f"para você lançar novas informações de '{ni}' em formato de {ROTULOS_TIPO_VALOR[tv]}."
             )
-            l_ed.addStretch(1)
 
-        abas.addTab(w_ed, "Editar / excluir")
-        abas.setCurrentIndex(self.estado.get("tab_eventos", 0))
-        abas.currentChanged.connect(lambda idx: self.estado.__setitem__("tab_eventos", idx))
-        container_lay.addWidget(abas)
+        cb_dash.currentIndexChanged.connect(lambda _: atualizar_explicacao())
+        cb_val.currentIndexChanged.connect(lambda _: atualizar_explicacao())
+        ed_info.textChanged.connect(lambda _: atualizar_explicacao())
+        atualizar_explicacao()
+
+        form.addRow("Exibição no Dashboard", cb_dash)
+        form.addRow("Nome da informação recebida", ed_info)
+        form.addRow("Tipo do valor", cb_val)
+        form.addRow(lbl_exp)
+
+        def ler_meta() -> dict:
+            return {
+                "tipo_dashboard": cb_dash.currentData() or "kpi",
+                "nome_info": ed_info.text().strip() or nome_info_padrao,
+                "tipo_valor": cb_val.currentData() or tipo_valor_padrao,
+            }
+
+        return ler_meta
+
+    def _valor_semente_inicial(self, origem: str, row: dict, meta: dict) -> dict | None:
+        if meta["itens"]:
+            return None
+        if origem == "dados_gerais":
+            bruto = str(row.get("valor") or "").strip()
+            if not bruto:
+                return None
+            val: object = bruto
+            if meta["tipo_valor"] in ("dinheiro", "numero"):
+                try:
+                    val = bk.parse_valor(bruto)
+                except ValueError:
+                    pass
+            return {"rotulo": "Valor inicial", "valor": val, "data": str(row.get("data") or "")}
+        if origem == "eventos":
+            val_num = float(row.get("valor") or 0.0)
+            if val_num <= 0:
+                return None
+            return {"rotulo": "Lançamento inicial", "valor": val_num, "data": str(row.get("data") or "")}
+        val_num = int(row.get("acompanhantes") or 0)
+        if val_num <= 0:
+            return None
+        return {"rotulo": "Lançamento inicial", "valor": val_num, "data": ""}
+
+    def _sincronizar_valor_campo_com_itens(self, origem: str, row: dict, meta_nova: dict):
+        id_ = int(row["id"])
+        itens = meta_nova["itens"]
+        tv = meta_nova["tipo_valor"]
+        if tv in ("dinheiro", "numero"):
+            soma = 0.0
+            for it in itens:
+                try:
+                    soma += bk.parse_valor(it.get("valor"))
+                except ValueError:
+                    pass
+            if origem == "dados_gerais":
+                val_str = self._fmt_valor_campo(soma, tv) if itens else ""
+                row["valor"] = val_str
+                db.atualizar_dado_geral(id_, {**row, "valor": val_str})
+            elif origem == "eventos":
+                row["valor"] = float(soma)
+                extras = {c: bk.texto(row.get(c, "")) for c in self.campos_personalizados}
+                db.atualizar("eventos", id_, {**row, "valor": float(soma)}, extras)
+            elif origem == "convidados":
+                row["acompanhantes"] = int(round(soma))
+                extras = {c: bk.texto(row.get(c, "")) for c in self.campos_personalizados}
+                db.atualizar("convidados", id_, {**row, "acompanhantes": int(round(soma))}, extras)
+            return
+
+        if origem == "dados_gerais":
+            ultimo = str(itens[-1].get("valor") or "") if itens else ""
+            val_str = f"{ultimo} ({len(itens)} itens)" if len(itens) > 1 else ultimo
+            row["valor"] = val_str
+            db.atualizar_dado_geral(id_, {**row, "valor": val_str})
+
+    def _abrir_dialogo_adicionar_dados_campo(self, origem: str, row: dict):
+        id_ = int(row["id"])
+        meta = db.obter_meta_campo(origem, id_)
+        titulo_card = str(row.get("titulo") or row.get("cliente") or row.get("nome") or f"Campo #{id_}")
+        tv = meta["tipo_valor"]
+        ni = meta["nome_info"]
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle(f"Adicionar dados — {titulo_card}")
+        dlg.setMinimumWidth(480)
+        lay = QVBoxLayout(dlg)
+        lay.setContentsMargins(18, 18, 18, 18)
+        lay.setSpacing(12)
+
+        lbl_info = QLabel(
+            f"Você está adicionando um novo lançamento de '{ni}' (tipo: {ROTULOS_TIPO_VALOR[tv]}) "
+            f"no campo '{titulo_card}', exibido no Dashboard como {ROTULOS_TIPO_DASH[meta['tipo_dashboard']]}."
+        )
+        lbl_info.setWordWrap(True)
+        lbl_info.setObjectName("Caption")
+        lay.addWidget(lbl_info)
+
+        form = QFormLayout()
+        form.setSpacing(10)
+
+        if tv in ("dinheiro", "numero"):
+            w_val = QDoubleSpinBox()
+            w_val.setRange(-1_000_000_000.0 if tv == "numero" else 0.0, 1_000_000_000.0)
+            w_val.setDecimals(2)
+            w_val.setSingleStep(100.0 if tv == "dinheiro" else 1.0)
+            if tv == "dinheiro":
+                w_val.setPrefix("R$ ")
+        else:
+            w_val = QLineEdit()
+            w_val.setPlaceholderText(f"Digite {ni.lower()}...")
+
+        ed_rot = QLineEdit()
+        ed_rot.setPlaceholderText("Ex.: Lote 2, Período tarde, Cliente X... (opcional)")
+        ed_dt = QDateEdit(QDate.currentDate())
+        ed_dt.setCalendarPopup(True)
+        ed_dt.setDisplayFormat("dd/MM/yyyy")
+
+        form.addRow(ni, w_val)
+        form.addRow("Identificação / Rótulo", ed_rot)
+        form.addRow("Data", ed_dt)
+        lay.addLayout(form)
+
+        lay.addWidget(QLabel("Histórico de informações deste campo:"))
+        lista = QListWidget()
+        lista.setMaximumHeight(150)
+
+        def preencher_lista(m_atual: dict):
+            lista.clear()
+            for idx, it in enumerate(m_atual["itens"], 1):
+                rot = str(it.get("rotulo") or f"Lançamento #{idx}")
+                dt = bk.fmt_data(it.get("data")) if it.get("data") else ""
+                v_fmt = self._fmt_valor_campo(it.get("valor"), m_atual["tipo_valor"])
+                txt = f"{rot} ({dt}) — {v_fmt}" if dt else f"{rot} — {v_fmt}"
+                lista.addItem(txt)
+            if not m_atual["itens"]:
+                semente = self._valor_semente_inicial(origem, row, m_atual)
+                if semente:
+                    v_fmt = self._fmt_valor_campo(semente["valor"], m_atual["tipo_valor"])
+                    lista.addItem(f"{semente['rotulo']} — {v_fmt}")
+
+        preencher_lista(meta)
+        lay.addWidget(lista)
+
+        lbl_err = QLabel()
+        lbl_err.setStyleSheet("color: #E5534B; font-weight: 600;")
+        lbl_err.setVisible(False)
+        lay.addWidget(lbl_err)
+
+        alterou_dados = False
+        rodape = QHBoxLayout()
+        btn_rem = QPushButton("Remover selecionado")
+        btn_rem.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        def ao_remover():
+            nonlocal alterou_dados
+            idx = lista.currentRow()
+            m_atual = db.obter_meta_campo(origem, id_)
+            if idx < 0 or idx >= len(m_atual["itens"]):
+                return
+            m_nova = db.remover_item_campo(origem, id_, idx)
+            self._sincronizar_valor_campo_com_itens(origem, row, m_nova)
+            alterou_dados = True
+            preencher_lista(m_nova)
+            btn_rem.setEnabled(bool(m_nova["itens"]) and lista.currentRow() >= 0)
+
+        btn_rem.clicked.connect(ao_remover)
+        btn_rem.setEnabled(bool(meta["itens"]) and lista.currentRow() >= 0)
+        lista.currentRowChanged.connect(lambda idx: btn_rem.setEnabled(idx >= 0 and bool(db.obter_meta_campo(origem, id_)["itens"])))
+        rodape.addWidget(btn_rem)
+        rodape.addStretch(1)
+
+        btn_fechar = QPushButton("Fechar")
+        btn_fechar.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_fechar.clicked.connect(dlg.reject)
+        btn_add = QPushButton("Adicionar informação")
+        btn_add.setObjectName("PrimaryBtn")
+        btn_add.setCursor(Qt.CursorShape.PointingHandCursor)
+
+        def ao_adicionar():
+            if isinstance(w_val, QDoubleSpinBox):
+                val_novo: object = float(w_val.value())
+            else:
+                val_novo = w_val.text().strip()
+                if not val_novo:
+                    lbl_err.setText(f"Informe o valor para '{ni}'.")
+                    lbl_err.setVisible(True)
+                    return
+
+            m_atual = db.obter_meta_campo(origem, id_)
+            semente = self._valor_semente_inicial(origem, row, m_atual)
+            if semente is not None:
+                m_atual = db.adicionar_item_campo(origem, id_, semente)
+
+            qdt = ed_dt.date()
+            data_iso = date(qdt.year(), qdt.month(), qdt.day()).isoformat()
+            rot_item = ed_rot.text().strip() or f"Lançamento #{len(m_atual['itens']) + 1}"
+            m_nova = db.adicionar_item_campo(origem, id_, {"rotulo": rot_item, "valor": val_novo, "data": data_iso})
+            self._sincronizar_valor_campo_com_itens(origem, row, m_nova)
+            self.aviso(f"Novo lançamento em '{titulo_card}': {rot_item}")
+            self.flash("Informação adicionada com sucesso.")
+            dlg.accept()
+            self.notificar_alteracao_dados()
+
+        btn_add.clicked.connect(ao_adicionar)
+        rodape.addWidget(btn_fechar)
+        rodape.addWidget(btn_add)
+        lay.addLayout(rodape)
+
+        if dlg.exec() == QDialog.DialogCode.Rejected and alterou_dados:
+            self.notificar_alteracao_dados()
+
+    def _preencher_grade_itens(self, lay_grade: QGridLayout, itens: list, criar_card_fn):
+        self._limpar_layout(lay_grade)
+        if not itens:
+            lay_grade.addWidget(AlertBox("Nenhum registro para exibir.", "info"), 0, 0, 1, 2)
+            return
+        for idx, item in enumerate(itens):
+            card = criar_card_fn(item)
+            lay_grade.addWidget(card, idx // 2, idx % 2)
+        if len(itens) == 1:
+            espaco = QWidget()
+            espaco.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+            lay_grade.addWidget(espaco, 0, 1)
+
+    def _preencher_grade_cards(self, lay_grade: QGridLayout, df: pd.DataFrame, criar_card_fn):
+        itens = [] if df.empty else [row_s.to_dict() for _, row_s in df.iterrows()]
+        self._preencher_grade_itens(lay_grade, itens, criar_card_fn)
+
+    def _abrir_dialogo_registro(self, titulo: str, texto_salvar: str, form: QFormLayout, ao_salvar):
+        dlg = QDialog(self)
+        dlg.setWindowTitle(titulo)
+        dlg.setMinimumWidth(460)
+        lay = QVBoxLayout(dlg)
+        lay.setContentsMargins(18, 18, 18, 18)
+        lay.setSpacing(12)
+        lay.addLayout(form)
+
+        lbl_err = QLabel()
+        lbl_err.setStyleSheet("color: #E5534B; font-weight: 600;")
+        lbl_err.setVisible(False)
+        lay.addWidget(lbl_err)
+
+        rodape = QHBoxLayout()
+        rodape.addStretch(1)
+        btn_canc = QPushButton("Cancelar")
+        btn_canc.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_canc.clicked.connect(dlg.reject)
+        btn_salv = QPushButton(texto_salvar)
+        btn_salv.setObjectName("PrimaryBtn")
+        btn_salv.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_salv.clicked.connect(lambda: ao_salvar(lbl_err, dlg))
+        rodape.addWidget(btn_canc)
+        rodape.addWidget(btn_salv)
+        lay.addLayout(rodape)
+        dlg.exec()
+
+    def _montar_aba_dados_financeiros(self, container_lay: QVBoxLayout, e: pd.DataFrame):
+        v = self.vocab()
+        g = self.dados("convidados")
+
+        barra = QHBoxLayout()
+        barra.setSpacing(10)
+
+        ed_busca = QLineEdit(self.estado.get("fin_busca", ""))
+        ed_busca.setPlaceholderText("Buscar em dados financeiros...")
+        barra.addWidget(ed_busca, stretch=1)
+
+        cb_cat = QComboBox()
+        cb_cat.addItem("Todas as categorias", "Todas")
+        cb_cat.addItem(v["ent1_plural"], "Receitas")
+        cb_cat.addItem(v["ent2_plural"], "Despesas")
+        cat_inicial = self.estado.get("fin_cat", "Todas")
+        idx_cat = cb_cat.findData(cat_inicial)
+        cb_cat.setCurrentIndex(idx_cat if idx_cat >= 0 else 0)
+        barra.addWidget(cb_cat)
+
+        btn_add_rec = QPushButton("+ Adicionar Receita")
+        btn_add_rec.setObjectName("PrimaryBtn")
+        btn_add_rec.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_add_rec.clicked.connect(lambda: self._abrir_dialogo_evento(None))
+        barra.addWidget(btn_add_rec)
+
+        btn_add_desp = QPushButton("+ Adicionar Despesa")
+        btn_add_desp.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_add_desp.clicked.connect(lambda: self._abrir_dialogo_convidado(None))
+        barra.addWidget(btn_add_desp)
+
+        container_lay.addLayout(barra)
+
+        grade_w = QWidget()
+        lay_grade = QGridLayout(grade_w)
+        lay_grade.setContentsMargins(0, 0, 0, 0)
+        lay_grade.setSpacing(12)
+        lay_grade.setColumnStretch(0, 1)
+        lay_grade.setColumnStretch(1, 1)
+        container_lay.addWidget(grade_w)
+        container_lay.addStretch(1)
+
+        def montar_card_financeiro(item: tuple[str, dict]) -> QFrame:
+            tipo, row = item
+            if tipo == "Receita":
+                return self._criar_card_evento(row, badge_categoria=v["ent1_singular"])
+            return self._criar_card_convidado(row, badge_categoria=v["ent2_singular"])
+
+        def atualizar_cards():
+            busca = ed_busca.text().strip()
+            cat = cb_cat.currentData() or "Todas"
+            self.estado["fin_busca"] = busca
+            self.estado["fin_cat"] = cat
+
+            itens: list[tuple[str, dict]] = []
+            if cat in ("Todas", "Receitas") and not e.empty:
+                for _, row_s in e.iterrows():
+                    itens.append(("Receita", row_s.to_dict()))
+            if cat in ("Todas", "Despesas") and not g.empty:
+                for _, row_s in g.iterrows():
+                    itens.append(("Despesa", row_s.to_dict()))
+
+            if busca:
+                termo = busca.lower()
+                itens = [
+                    (tipo, row)
+                    for tipo, row in itens
+                    if termo in tipo.lower()
+                    or any(termo in str(val).lower() for val in row.values() if val is not None)
+                ]
+
+            self._preencher_grade_itens(lay_grade, itens, montar_card_financeiro)
+
+        ed_busca.textChanged.connect(lambda _: atualizar_cards())
+        cb_cat.currentIndexChanged.connect(lambda _: atualizar_cards())
+        atualizar_cards()
+
+    def _criar_card_evento(self, row: dict, badge_categoria: str | None = None) -> QFrame:
+        v = self.vocab()
+        rot = v["rotulos"]
+        qtd_rot = rot["convidados"]
+        qtd_val = (
+            self.moeda(row.get("convidados", 0) or 0)
+            if "R$" in qtd_rot
+            else str(int(row.get("convidados", 0) or 0))
+        )
+        campos: list[tuple[str, str, bool]] = [
+            (rot["data"], bk.fmt_data(row.get("data")), False),
+            (rot["local"], str(row.get("local") or "—"), False),
+            (rot["valor"], self.moeda(row.get("valor", 0) or 0), True),
+            (qtd_rot, qtd_val, False),
+        ]
+        if badge_categoria is not None:
+            campos.append(("Situação", str(row.get("status") or "—"), False))
+        meta, resumo = self._meta_e_resumo_card("eventos", row)
+        if meta is not None:
+            campos.append((
+                "Campo no Dashboard",
+                f"{ROTULOS_TIPO_DASH[meta['tipo_dashboard']]} · {meta['nome_info']} ({ROTULOS_TIPO_VALOR[meta['tipo_valor']]})",
+                False,
+            ))
+        for c in self.campos_personalizados:
+            val_ex = bk.texto(row.get(c, ""))
+            if val_ex:
+                campos.append((c, val_ex, False))
+        return self._criar_card_registro(
+            titulo=str(row.get("cliente") or "—"),
+            status=badge_categoria if badge_categoria is not None else str(row.get("status") or ""),
+            campos=campos,
+            ao_editar=lambda: self._abrir_dialogo_evento(row),
+            ao_excluir=lambda: self._excluir_card_evento(row),
+            ao_adicionar_dados=(lambda: self._abrir_dialogo_adicionar_dados_campo("eventos", row)) if row.get("id") is not None else None,
+            resumo_itens=resumo,
+        )
+
+    def _abrir_dialogo_evento(self, row: dict | None):
+        v = self.vocab()
+        form, ler = self._montar_form_evento(row)
+        eh_edicao = row is not None
+        titulo = f"Editar {v['ent1_singular']}" if eh_edicao else f"Adicionar {v['ent1_singular']}"
+        texto_btn = "Salvar alterações" if eh_edicao else "Cadastrar"
+
+        def salvar(lbl_err: QLabel, dlg: QDialog):
+            dd, extras, meta = ler()
+            if not dd["cliente"]:
+                lbl_err.setText(f"Informe o campo '{v['rotulos']['cliente']}'.")
+                lbl_err.setVisible(True)
+                return
+            if eh_edicao:
+                id_sel = int(row["id"])
+                db.atualizar("eventos", id_sel, dd, extras)
+                db.sincronizar_meta_com_valor_registro("eventos", id_sel, dd.get("valor"), dd.get("data", ""), meta)
+                if dd["cliente"] != row.get("cliente"):
+                    db.renomear_evento_nos_convidados(dd["cliente"], row.get("cliente", ""))
+                self.aviso(f"{v['ent1_singular']} atualizado(a): {dd['cliente']}")
+                self.flash("Registro atualizado.")
+            else:
+                novo_id = db.inserir_lote("eventos", [dd], extras)
+                if novo_id is not None:
+                    db.sincronizar_meta_com_valor_registro("eventos", int(novo_id), dd.get("valor"), dd.get("data", ""), meta)
+                self.aviso(f"Novo registro ({v['ent1_singular']}): {dd['cliente']}")
+                self.flash(f"{v['ent1_singular']} cadastrado(a) com sucesso.")
+            dlg.accept()
+            self.notificar_alteracao_dados()
+
+        self._abrir_dialogo_registro(titulo, texto_btn, form, salvar)
+
+    def _excluir_card_evento(self, row: dict):
+        v = self.vocab()
+        id_sel = int(row["id"])
+        desc = str(row.get("cliente") or f"#{id_sel}")
+        vinc = db.contar_convidados_do_evento(desc)
+        msg = f"Deseja excluir '{desc}'?"
+        if vinc:
+            msg += f"\n\n{vinc} registro(s) em '{v['ent2_plural']}' estão vinculados a este item e continuarão cadastrados."
+        resp = QMessageBox.question(
+            self,
+            "Confirmar exclusão",
+            msg,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if resp == QMessageBox.StandardButton.Yes:
+            db.excluir("eventos", id_sel)
+            self.aviso(f"Registro excluído: {desc}")
+            self.flash("Registro excluído.")
+            self.notificar_alteracao_dados()
 
     def _montar_form_evento(self, v_row: dict | None):
         v_row = {} if v_row is None else v_row
@@ -1957,6 +2601,14 @@ class OneWorldWindow(QMainWindow):
             campos_ex[c] = ed_x
             form.addRow(c, ed_x)
 
+        ler_meta = self._montar_secao_config_campo(
+            form,
+            "eventos",
+            v_row.get("id"),
+            nome_info_padrao="Receita lançada",
+            tipo_valor_padrao="dinheiro",
+        )
+
         def ler():
             qdt = ed_dt.date()
             iso = date(qdt.year(), qdt.month(), qdt.day()).isoformat()
@@ -1969,7 +2621,7 @@ class OneWorldWindow(QMainWindow):
                 "status": cb_st.currentText(),
             }
             extras = {c: ed.text().strip() for c, ed in campos_ex.items()}
-            return dados_ev, extras
+            return dados_ev, extras, ler_meta()
 
         return form, ler
 
@@ -1991,7 +2643,7 @@ class OneWorldWindow(QMainWindow):
             db.excluir(tab, id_)
             self.aviso(f"Registro excluído: {descricao}")
             self.flash("Registro excluído.")
-            self.reconstruir_pagina()
+            self.notificar_alteracao_dados()
 
         btn.clicked.connect(confirmar)
         lay.addWidget(chk)
@@ -2072,7 +2724,7 @@ class OneWorldWindow(QMainWindow):
             db.excluir_lote(tab, ids)
             self.aviso(f"{len(ids)} registro(s) excluído(s) em lote ({tab}).")
             self.flash(f"{len(ids)} registro(s) excluído(s).")
-            self.reconstruir_pagina()
+            self.notificar_alteracao_dados()
 
         ed_filtro.textChanged.connect(filtrar_itens)
         btn_todos.clicked.connect(lambda: marcar_visiveis(True))
@@ -2088,230 +2740,256 @@ class OneWorldWindow(QMainWindow):
     # ── ABA SECUNDÁRIA UNIFICADA (GASTOS / DESPESAS / CADASTROS) ──
     def pagina_convidados(self):
         self.estado["tab_modulo_fin"] = 1
+        self.estado["fin_cat"] = "Despesas"
         self.pagina_eventos()
 
-    def _montar_aba_convidados(self, container_lay: QVBoxLayout):
+    def _criar_card_convidado(self, row: dict, badge_categoria: str | None = None) -> QFrame:
         v = self.vocab()
         rot = v["rotulos"]
-        abas = QTabWidget()
+        val_rot = rot["acompanhantes"]
+        val_txt = (
+            self.moeda(row.get("acompanhantes", 0) or 0)
+            if "R$" in val_rot
+            else str(int(row.get("acompanhantes", 0) or 0))
+        )
+        campos: list[tuple[str, str, bool]] = [
+            (rot["evento"], str(row.get("evento") or "—"), False),
+            (rot["mesa"], str(row.get("mesa") or "—"), False),
+            (val_rot, val_txt, True),
+            (rot["contato"], str(row.get("contato") or "—"), False),
+        ]
+        if badge_categoria is not None:
+            campos.append(("Situação", str(row.get("confirmacao") or "—"), False))
+        meta, resumo = self._meta_e_resumo_card("convidados", row)
+        if meta is not None:
+            campos.append((
+                "Campo no Dashboard",
+                f"{ROTULOS_TIPO_DASH[meta['tipo_dashboard']]} · {meta['nome_info']} ({ROTULOS_TIPO_VALOR[meta['tipo_valor']]})",
+                False,
+            ))
+        restr = str(row.get("restricao") or "").strip()
+        if restr and restr != "—":
+            campos.append((rot["restricao"], restr, False))
+        for c in self.campos_personalizados:
+            val_ex = bk.texto(row.get(c, ""))
+            if val_ex:
+                campos.append((c, val_ex, False))
+        return self._criar_card_registro(
+            titulo=str(row.get("nome") or "—"),
+            status=badge_categoria if badge_categoria is not None else str(row.get("confirmacao") or ""),
+            campos=campos,
+            ao_editar=lambda: self._abrir_dialogo_convidado(row),
+            ao_excluir=lambda: self._excluir_card_convidado(row),
+            ao_adicionar_dados=(lambda: self._abrir_dialogo_adicionar_dados_campo("convidados", row)) if row.get("id") is not None else None,
+            resumo_itens=resumo,
+        )
 
-        # Aba 1: Listagem
-        w_lista = QWidget()
-        l_lista = QVBoxLayout(w_lista)
-        l_lista.setContentsMargins(16, 16, 16, 16)
-        l_lista.setSpacing(12)
+    def _abrir_dialogo_convidado(self, row: dict | None):
+        v = self.vocab()
+        rot = v["rotulos"]
+        form, ler = self._montar_form_convidado(row)
+        eh_edicao = row is not None
+        titulo = f"Editar {v['ent2_singular']}" if eh_edicao else f"Adicionar {v['ent2_singular']}"
+        texto_btn = "Salvar alterações" if eh_edicao else "Adicionar"
 
-        g = self.dados("convidados")
-        barra_f = QHBoxLayout()
-        barra_f.setSpacing(14)
+        def salvar(lbl_err: QLabel, dlg: QDialog):
+            dd, extras, meta = ler()
+            if not dd["nome"]:
+                lbl_err.setText(f"Informe o campo '{rot['nome']}'.")
+                lbl_err.setVisible(True)
+                return
+            if eh_edicao:
+                id_sel = int(row["id"])
+                db.atualizar("convidados", id_sel, dd, extras)
+                db.sincronizar_meta_com_valor_registro("convidados", id_sel, dd.get("acompanhantes"), "", meta)
+                self.aviso(f"{v['ent2_singular']} atualizado(a): {dd['nome']}")
+                self.flash("Registro atualizado.")
+            else:
+                novo_id = db.inserir_lote("convidados", [dd], extras)
+                if novo_id is not None:
+                    db.sincronizar_meta_com_valor_registro(
+                        "convidados", int(novo_id), dd.get("acompanhantes"), date.today().isoformat(), meta
+                    )
+                self.aviso(f"Novo registro ({v['ent2_singular']}): {dd['nome']}")
+                self.flash(f"{v['ent2_singular']} adicionado(a).")
+            dlg.accept()
+            self.notificar_alteracao_dados()
 
-        c1 = QVBoxLayout()
-        c1.addWidget(QLabel(f"Buscar em {v['ent2_plural'].lower()}"))
-        ed_busca = QLineEdit(self.estado.get("cv_busca", ""))
-        ed_busca.setPlaceholderText("Digite para filtrar...")
-        c1.addWidget(ed_busca)
-        barra_f.addLayout(c1, stretch=1)
+        self._abrir_dialogo_registro(titulo, texto_btn, form, salvar)
 
-        c2 = QVBoxLayout()
-        c2.addWidget(QLabel(rot["evento"]))
-        evs_disp = sorted(str(x) for x in g["evento"].unique() if str(x).strip()) if not g.empty else []
-        ms_ev = MultiSelectChips(evs_disp, self.estado.get("cv_evento", []), self.cfg["cor"])
-        c2.addWidget(ms_ev)
-        barra_f.addLayout(c2, stretch=1)
+    def _excluir_card_convidado(self, row: dict):
+        id_sel = int(row["id"])
+        desc = str(row.get("nome") or f"#{id_sel}")
+        resp = QMessageBox.question(
+            self,
+            "Confirmar exclusão",
+            f"Deseja excluir '{desc}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if resp == QMessageBox.StandardButton.Yes:
+            db.excluir("convidados", id_sel)
+            self.aviso(f"Registro excluído: {desc}")
+            self.flash("Registro excluído.")
+            self.notificar_alteracao_dados()
 
-        c3 = QVBoxLayout()
-        c3.addWidget(QLabel(rot["confirmacao"]))
-        ms_cf = MultiSelectChips(STATUS_CONV, self.estado.get("cv_conf", []), self.cfg["cor"])
-        c3.addWidget(ms_cf)
-        barra_f.addLayout(c3, stretch=1)
-        l_lista.addLayout(barra_f)
+    # ── ABA TERCIÁRIA: DADOS GERAIS ──
+    def _montar_aba_dados_gerais(self, container_lay: QVBoxLayout):
+        dg = db.carregar_dados_gerais()
 
-        linha_m = QHBoxLayout()
-        linha_m.setSpacing(12)
-        card_total_gasto = MetricCard("Total de Gastos Filtrados", self.moeda(0))
-        card_conf = MetricCard("Quitados / Confirmados", 0)
-        card_pend = MetricCard("A pagar / Pendentes", 0)
-        linha_m.addWidget(card_total_gasto)
-        linha_m.addWidget(card_conf)
-        linha_m.addWidget(card_pend)
-        l_lista.addLayout(linha_m)
+        barra = QHBoxLayout()
+        barra.setSpacing(12)
 
-        container_tab = QWidget()
-        lay_tab = QVBoxLayout(container_tab)
-        lay_tab.setContentsMargins(0, 0, 0, 0)
-        l_lista.addWidget(container_tab)
+        ed_busca = QLineEdit(self.estado.get("dg_busca", ""))
+        ed_busca.setPlaceholderText("Buscar em dados gerais...")
+        barra.addWidget(ed_busca, stretch=1)
 
-        btn_csv = QPushButton("Exportar CSV")
-        btn_csv.setCursor(Qt.CursorShape.PointingHandCursor)
-        l_lista.addWidget(btn_csv, alignment=Qt.AlignmentFlag.AlignLeft)
-        l_lista.addStretch(1)
+        btn_add = QPushButton("+ Adicionar Dado Geral")
+        btn_add.setObjectName("PrimaryBtn")
+        btn_add.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_add.clicked.connect(lambda: self._abrir_dialogo_dado_geral(None))
+        barra.addWidget(btn_add)
+        container_lay.addLayout(barra)
 
-        def atualizar_lista_conv():
-            self._limpar_layout(lay_tab)
+        grade_w = QWidget()
+        lay_grade = QGridLayout(grade_w)
+        lay_grade.setContentsMargins(0, 0, 0, 0)
+        lay_grade.setSpacing(12)
+        lay_grade.setColumnStretch(0, 1)
+        lay_grade.setColumnStretch(1, 1)
+        container_lay.addWidget(grade_w)
+        container_lay.addStretch(1)
+
+        def atualizar_cards():
             busca = ed_busca.text().strip()
-            evs = ms_ev.valores()
-            conf = ms_cf.valores()
-            self.estado["cv_busca"] = busca
-            self.estado["cv_evento"] = evs
-            self.estado["cv_conf"] = conf
-
-            df_f = g.copy()
-            if busca:
+            self.estado["dg_busca"] = busca
+            df_f = dg.copy()
+            if busca and not df_f.empty:
                 df_f = df_f[
                     df_f.astype(str).apply(lambda col: col.str.contains(busca, case=False, na=False)).any(axis=1)
                 ]
-            if evs:
-                df_f = df_f[df_f["evento"].isin(evs)]
-            if conf:
-                df_f = df_f[df_f["confirmacao"].isin(conf)]
+            self._preencher_grade_cards(lay_grade, df_f, self._criar_card_dado_geral)
 
-            total_g = (
-                df_f[df_f["confirmacao"] != "Recusou"]["acompanhantes"].sum()
-                if not df_f.empty
-                else 0
-            )
-            card_total_gasto.atualizar(self.moeda(total_g))
-            card_conf.atualizar(int((df_f["confirmacao"] == "Confirmado").sum()) if not df_f.empty else 0)
-            card_pend.atualizar(int((df_f["confirmacao"] == "Pendente").sum()) if not df_f.empty else 0)
+        ed_busca.textChanged.connect(lambda _: atualizar_cards())
+        atualizar_cards()
 
-            lay_tab.addWidget(
-                PaginatedTableWidget(
-                    self.formatar(df_f, "convidados"),
-                    linhas_por_pagina=self.cfg["linhas"],
-                    pagina_inicial=self.estado.get("pg_convidados", 1),
-                    ao_mudar_pagina=lambda pg: self.estado.__setitem__("pg_convidados", pg),
-                )
-            )
-            try:
-                btn_csv.clicked.disconnect()
-            except Exception:
-                pass
-            nome_csv = f"{bk.chave(v['ent2_plural']) or 'cadastros'}.csv"
-            btn_csv.clicked.connect(lambda: self._exportar_csv_dialogo(df_f, nome_csv))
+    def _criar_card_dado_geral(self, row: dict) -> QFrame:
+        campos: list[tuple[str, str, bool]] = [
+            ("Valor / Referência", str(row.get("valor") or "—"), bool(str(row.get("valor") or "").strip())),
+            ("Data", bk.fmt_data(row.get("data")), False),
+        ]
+        meta, resumo = self._meta_e_resumo_card("dados_gerais", row)
+        if meta is not None:
+            campos.append((
+                "Campo no Dashboard",
+                f"{ROTULOS_TIPO_DASH[meta['tipo_dashboard']]} · {meta['nome_info']} ({ROTULOS_TIPO_VALOR[meta['tipo_valor']]})",
+                False,
+            ))
+        desc = str(row.get("descricao") or "").strip()
+        if desc:
+            campos.append(("Descrição", desc, False))
+        return self._criar_card_registro(
+            titulo=str(row.get("titulo") or "—"),
+            status=str(row.get("categoria") or "Geral"),
+            campos=campos,
+            ao_editar=lambda: self._abrir_dialogo_dado_geral(row),
+            ao_excluir=lambda: self._excluir_card_dado_geral(row),
+            ao_adicionar_dados=(lambda: self._abrir_dialogo_adicionar_dados_campo("dados_gerais", row)) if row.get("id") is not None else None,
+            resumo_itens=resumo,
+        )
 
-        ed_busca.textChanged.connect(lambda _: atualizar_lista_conv())
-        ms_ev.changed.connect(lambda _: atualizar_lista_conv())
-        ms_cf.changed.connect(lambda _: atualizar_lista_conv())
-        atualizar_lista_conv()
-        abas.addTab(w_lista, v["ent2_plural"])
+    def _montar_form_dado_geral(self, v_row: dict | None):
+        v_row = {} if v_row is None else v_row
+        form = QFormLayout()
+        form.setSpacing(10)
 
-        # Aba 2: + Adicionar
-        w_novo = QWidget()
-        l_novo = QVBoxLayout(w_novo)
-        l_novo.setContentsMargins(16, 16, 16, 16)
-        l_novo.setSpacing(12)
+        ed_tit = QLineEdit(str(v_row.get("titulo", "")))
+        ed_tit.setPlaceholderText("Ex.: Meta trimestral, Estoque atual, Clientes ativos...")
+        ed_cat = QLineEdit(str(v_row.get("categoria", "")))
+        ed_cat.setPlaceholderText("Ex.: Operacional, Comercial, Financeiro, Geral...")
+        ed_val = QLineEdit(str(v_row.get("valor", "")))
+        ed_val.setPlaceholderText("Ex.: R$ 50.000, 120 un., 15%...")
 
-        form_nc, ler_nc = self._montar_form_convidado(None)
-        l_novo.addLayout(form_nc)
-        lbl_erro_nc = QLabel()
-        lbl_erro_nc.setStyleSheet("color: #8F2412; font-weight: 600;")
-        lbl_erro_nc.setVisible(False)
-        l_novo.addWidget(lbl_erro_nc)
+        dt_val = bk.parse_date(v_row.get("data")) or date.today()
+        ed_dt = QDateEdit(QDate(dt_val.year, dt_val.month, dt_val.day))
+        ed_dt.setCalendarPopup(True)
+        ed_dt.setDisplayFormat("dd/MM/yyyy")
 
-        btn_add = QPushButton("Adicionar")
-        btn_add.setObjectName("PrimaryBtn")
-        btn_add.setCursor(Qt.CursorShape.PointingHandCursor)
+        ed_desc = QPlainTextEdit(str(v_row.get("descricao", "")))
+        ed_desc.setMaximumHeight(80)
+        ed_desc.setPlaceholderText("Observações ou detalhes adicionais (opcional)...")
 
-        def salvar_novo_conv():
-            dd, extras = ler_nc()
-            if not dd["nome"]:
-                lbl_erro_nc.setText(f"Informe o campo '{rot['nome']}'.")
-                lbl_erro_nc.setVisible(True)
+        form.addRow("Título / Nome", ed_tit)
+        form.addRow("Categoria", ed_cat)
+        form.addRow("Valor / Referência", ed_val)
+        form.addRow("Data", ed_dt)
+        form.addRow("Descrição", ed_desc)
+
+        ler_meta = self._montar_secao_config_campo(
+            form,
+            "dados_gerais",
+            v_row.get("id"),
+            nome_info_padrao=str(v_row.get("titulo") or "Valor"),
+            tipo_valor_padrao="numero",
+        )
+
+        def ler() -> tuple[dict, dict]:
+            qdt = ed_dt.date()
+            dados_dg = {
+                "titulo": ed_tit.text().strip(),
+                "categoria": ed_cat.text().strip() or "Geral",
+                "valor": ed_val.text().strip(),
+                "data": date(qdt.year(), qdt.month(), qdt.day()).isoformat(),
+                "descricao": ed_desc.toPlainText().strip(),
+            }
+            return dados_dg, ler_meta()
+
+        return form, ler
+
+    def _abrir_dialogo_dado_geral(self, row: dict | None):
+        form, ler = self._montar_form_dado_geral(row)
+        eh_edicao = row is not None
+        titulo = "Editar Dado Geral" if eh_edicao else "Adicionar Dado Geral"
+        texto_btn = "Salvar alterações" if eh_edicao else "Adicionar"
+
+        def salvar(lbl_err: QLabel, dlg: QDialog):
+            dd, meta = ler()
+            if not dd["titulo"]:
+                lbl_err.setText("Informe o campo 'Título / Nome'.")
+                lbl_err.setVisible(True)
                 return
-            db.inserir_lote("convidados", [dd], extras)
-            self.aviso(f"Novo registro ({v['ent2_singular']}): {dd['nome']}")
-            self.flash(f"{v['ent2_singular']} adicionado(a).")
-            self.reconstruir_pagina()
+            if eh_edicao:
+                id_sel = int(row["id"])
+                db.atualizar_dado_geral(id_sel, dd)
+                db.sincronizar_meta_com_valor_registro("dados_gerais", id_sel, dd.get("valor"), dd.get("data", ""), meta)
+                self.aviso(f"Dado geral atualizado: {dd['titulo']}")
+                self.flash("Registro atualizado.")
+            else:
+                novo_id = db.inserir_dado_geral(dd)
+                if novo_id is not None:
+                    db.sincronizar_meta_com_valor_registro("dados_gerais", int(novo_id), dd.get("valor"), dd.get("data", ""), meta)
+                self.aviso(f"Novo dado geral: {dd['titulo']}")
+                self.flash("Dado geral adicionado.")
+            dlg.accept()
+            self.notificar_alteracao_dados()
 
-        btn_add.clicked.connect(salvar_novo_conv)
-        l_novo.addWidget(btn_add, alignment=Qt.AlignmentFlag.AlignLeft)
-        l_novo.addStretch(1)
-        abas.addTab(w_novo, f"+ Adicionar {v['ent2_singular']}")
+        self._abrir_dialogo_registro(titulo, texto_btn, form, salvar)
 
-        # Aba 3: Editar / excluir
-        w_ed = QWidget()
-        l_ed = QVBoxLayout(w_ed)
-        l_ed.setContentsMargins(16, 16, 16, 16)
-        l_ed.setSpacing(12)
-
-        if g.empty:
-            l_ed.addWidget(AlertBox(f"Nenhum registro em {v['ent2_plural'].lower()}.", "info"))
-        else:
-            l_ed.addWidget(QLabel(f"Escolha o registro ({v['ent2_singular']})"))
-            cb_sel = QComboBox()
-            ids = []
-            for r in g.itertuples():
-                ids.append(int(r.id))
-                cb_sel.addItem(f"#{r.id} · {r.nome} · {r.evento}", userData=int(r.id))
-            sel_atual = self.estado.get("cv_sel", ids[0])
-            if sel_atual in ids:
-                cb_sel.setCurrentIndex(ids.index(sel_atual))
-            l_ed.addWidget(cb_sel)
-
-            area_ed = QWidget()
-            lay_area_ed = QVBoxLayout(area_ed)
-            lay_area_ed.setContentsMargins(0, 0, 0, 0)
-            lay_area_ed.setSpacing(10)
-            l_ed.addWidget(area_ed)
-
-            def montar_edicao_conv():
-                self._limpar_layout(lay_area_ed)
-                id_sel = cb_sel.currentData()
-                self.estado["cv_sel"] = id_sel
-                row = g[g["id"] == id_sel].iloc[0].to_dict()
-                form_ec, ler_ec = self._montar_form_convidado(row)
-                lay_area_ed.addLayout(form_ec)
-
-                lbl_err = QLabel()
-                lbl_err.setStyleSheet("color: #8F2412; font-weight: 600;")
-                lbl_err.setVisible(False)
-                lay_area_ed.addWidget(lbl_err)
-
-                btn_salvar = QPushButton("Salvar alterações")
-                btn_salvar.setObjectName("PrimaryBtn")
-                btn_salvar.setCursor(Qt.CursorShape.PointingHandCursor)
-
-                def confirmar_edicao():
-                    dd, extras = ler_ec()
-                    if not dd["nome"]:
-                        lbl_err.setText(f"Informe o campo '{rot['nome']}'.")
-                        lbl_err.setVisible(True)
-                        return
-                    db.atualizar("convidados", id_sel, dd, extras)
-                    self.aviso(f"{v['ent2_singular']} atualizado(a): {dd['nome']}")
-                    self.flash("Registro atualizado.")
-                    self.reconstruir_pagina()
-
-                btn_salvar.clicked.connect(confirmar_edicao)
-                lay_area_ed.addWidget(btn_salvar, alignment=Qt.AlignmentFlag.AlignLeft)
-                lay_area_ed.addWidget(Divider())
-                lay_area_ed.addWidget(self._bloco_excluir("convidados", id_sel, row["nome"]))
-
-            cb_sel.currentIndexChanged.connect(lambda _: montar_edicao_conv())
-            montar_edicao_conv()
-            l_ed.addWidget(Divider())
-            l_ed.addWidget(
-                self._bloco_excluir_lote(
-                    "convidados",
-                    g,
-                    lambda r: f"#{r.id} · {r.nome} · {r.evento}",
-                )
-            )
-            l_ed.addStretch(1)
-
-        abas.addTab(w_ed, "Editar / excluir")
-
-        # Aba 4: Importar planilha
-        w_imp = QWidget()
-        l_imp = QVBoxLayout(w_imp)
-        l_imp.setContentsMargins(16, 16, 16, 16)
-        l_imp.addWidget(ImportarPlanilhaWidget(self, destino_fixo="convidados", chave_estado="impcv"))
-        l_imp.addStretch(1)
-        abas.addTab(w_imp, "Importar planilha")
-        abas.setCurrentIndex(self.estado.get("tab_convidados", 0))
-        abas.currentChanged.connect(lambda idx: self.estado.__setitem__("tab_convidados", idx))
-
-        container_lay.addWidget(abas)
+    def _excluir_card_dado_geral(self, row: dict):
+        id_sel = int(row["id"])
+        desc = str(row.get("titulo") or f"#{id_sel}")
+        resp = QMessageBox.question(
+            self,
+            "Confirmar exclusão",
+            f"Deseja excluir '{desc}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if resp == QMessageBox.StandardButton.Yes:
+            db.excluir_dado_geral(id_sel)
+            self.aviso(f"Registro excluído: {desc}")
+            self.flash("Registro excluído.")
+            self.notificar_alteracao_dados()
 
     def _montar_form_convidado(self, v_row: dict | None):
         v_row = {} if v_row is None else v_row
@@ -2362,6 +3040,14 @@ class OneWorldWindow(QMainWindow):
             campos_ex[c] = ed_x
             form.addRow(c, ed_x)
 
+        ler_meta = self._montar_secao_config_campo(
+            form,
+            "convidados",
+            v_row.get("id"),
+            nome_info_padrao="Despesa lançada",
+            tipo_valor_padrao="dinheiro",
+        )
+
         def ler():
             ev_txt = w_ev.currentText() if isinstance(w_ev, QComboBox) else w_ev.text().strip()
             dados_cv = {
@@ -2374,7 +3060,7 @@ class OneWorldWindow(QMainWindow):
                 "confirmacao": cb_cf.currentText(),
             }
             extras = {c: ed.text().strip() for c, ed in campos_ex.items()}
-            return dados_cv, extras
+            return dados_cv, extras, ler_meta()
 
         return form, ler
 
@@ -3309,7 +3995,7 @@ class OneWorldWindow(QMainWindow):
             self.estado = {} if aba is None else {"tab_config": aba}
             self.aplicar_tema()
         self.reconstruir_sidebar()
-        self.reconstruir_pagina()
+        self.notificar_alteracao_dados()
 
     # ── Planilha padrão e IA externa (fluxo manual, sem chamadas de IA) ──
     # Diálogos modais passam por _confirmar, _mostrar_mensagem e _revisar_importacao_planilha (testáveis).
@@ -3640,7 +4326,7 @@ class OneWorldWindow(QMainWindow):
                   if res.inclusoes.get(t) or res.alteracoes.get(t)]
         total = sum(res.inclusoes.values()) + sum(res.alteracoes.values())
         self.aviso(f"Planilha padrão importada: {total} registro(s) gravado(s)")
-        self.reconstruir_pagina()
+        self.notificar_alteracao_dados()
         self._mostrar_mensagem(
             "info", "Planilha importada",
             self._tabela_html(["Tabela", "Incluídos", "Alterados"], linhas)
