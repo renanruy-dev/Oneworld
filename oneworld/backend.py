@@ -56,12 +56,18 @@ def parse_valor(v):
         return 0.0
     if isinstance(v, (int, float)):
         return float(v)
+
     s = re.sub(r"[^\d,.\-]", "", str(v))
+
     if "," in s:
         s = s.replace(".", "").replace(",", ".")
-    elif s.count(".") > 1:
+    elif re.fullmatch(r"-?[1-9]\d{0,2}(?:\.\d{3})+", s):
         s = s.replace(".", "")
-    return float(s)
+
+    try:
+        return float(s)
+    except ValueError:
+        raise ValueError(f"número inválido: '{v}'")
 
 
 def norm_opcao(v, opcoes, padrao):

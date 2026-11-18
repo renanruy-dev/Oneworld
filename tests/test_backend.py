@@ -1,6 +1,7 @@
 """Testes unitários das regras de negócio do OneWorld (backend e config)."""
 from datetime import date
 import pandas as pd
+import pytest
 from oneworld import backend as bk
 from oneworld import config as cfg
 
@@ -24,6 +25,38 @@ def test_parse_valor():
     assert bk.parse_valor("25000.00") == 25000.00
     assert bk.parse_valor(120) == 120.0
     assert bk.parse_valor("") == 0.0
+
+
+@pytest.mark.parametrize("texto, esperado", [
+    ("1.500", 1500.0),             # ponto de milhar (padrão brasileiro)
+    ("R$ 1.500", 1500.0),
+    ("12.345", 12345.0),
+    ("-1.500", -1500.0),
+    ("1.500.000", 1500000.0),
+    ("1.500,50", 1500.50),         # formato completo continua igual
+    ("0.500", 0.5),                # zero à esquerda: decimal
+    ("25000.00", 25000.0),         # duas casas: decimal
+    ("1,5", 1.5),                  # vírgula: decimal
+])
+def test_parse_valor_ponto_de_milhar(texto, esperado):
+    assert bk.parse_valor(texto) == esperado
+
+
+@pytest.mark.parametrize("texto", ["abc", "R$", "-"])
+def test_parse_valor_invalido_tem_mensagem_clara(texto):
+    with pytest.raises(ValueError, match="número inválido"):
+        bk.parse_valor(texto)
+
+
+def test_validar_valor_invalido_gera_erro_legivel():
+    df = pd.DataFrame([{"d": "2026-11-01", "c": "Alfa", "v": "abc"}])
+    mapa = {"data": "d", "cliente": "c", "local": None, "convidados": None, "valor": "v", "status": None}
+    existentes = pd.DataFrame(columns=["data", "cliente", "local", "convidados", "valor", "status"])
+    res = bk.validar(df, "eventos", mapa, existentes)
+    assert res["ok"] == []
+    assert len(res["erros"]) == 1
+    assert "número inválido" in res["erros"][0]["Motivo"]
+    assert res["erros"][0]["Linha no arquivo"] == 2
 
 
 def test_norm_opcao():
@@ -73,7 +106,8 @@ def test_validar_planilha():
     assert len(res["ok"]) == 2
     assert len(res["erros"]) == 0
     assert res["ok"][0]["cliente"] == "Empresa Alfa"
-    assert res["ok"][0]["valor"] == 5000.0
+    assert res["ok"][0]["valor"] == 5000.
+
 
 
 def test_responder_ia():
