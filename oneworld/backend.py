@@ -4,7 +4,7 @@ recebe DataFrames/valores e devolve DataFrames/valores."""
 import json
 import re
 import unicodedata
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pandas as pd
 
@@ -12,6 +12,7 @@ from .config import (
     ALIAS_OPCAO,
     ASSETS_DIR,
     LOGO_PADRAO,
+    PADROES,
     SINONIMOS,
     STATUS_CONV,
     STATUS_EVENTO,
@@ -167,6 +168,208 @@ def resumo_financeiro(e: pd.DataFrame, cv: pd.DataFrame) -> dict:
         "rendimento_liquido": rendimento,
         "margem_pct": margem,
         "gastos_por_categoria": serie_gastos,
+    }
+
+
+def _subtrair_meses(ym: str, meses: int) -> str:
+    ano, mes = int(ym[:4]), int(ym[5:7])
+    total = ano * 12 + (mes - 1) - meses
+    n_ano, n_mes = divmod(total, 12)
+    return f"{n_ano:04d}-{n_mes + 1:02d}"
+
+
+def _avaliar_variacao_receita(
+    chave: str,
+    rotulo: str,
+    rot_atual: str,
+    rot_ant: str,
+    rec_atual: float,
+    rec_ant: float,
+    disponivel: bool,
+    motivo_indisp: str,
+    cfg: dict,
+) -> dict:
+    if not disponivel:
+        return {
+            "chave": chave,
+            "rotulo": rotulo,
+            "disponivel": False,
+            "rec_atual": rec_atual,
+            "rec_anterior": rec_ant,
+            "delta_valor": None,
+            "delta_pct": None,
+            "nivel": "neutro",
+            "tipo_alerta": "info",
+            "titulo": f"{rotulo}: sem histórico suficiente",
+            "resumo": motivo_indisp,
+            "valor_curto": "Sem histórico",
+        }
+
+    delta_valor = rec_atual - rec_ant
+    delta_pct = ((delta_valor / rec_ant) * 100.0) if rec_ant > 0 else None
+
+    if delta_pct is not None:
+        if delta_pct > 5.0:
+            nivel, tipo_alerta, prefixo = "verde", "success", "Aumento de receita"
+        elif delta_pct < -5.0:
+            nivel, tipo_alerta, prefixo = "vermelho", "error", "Perda de receita"
+        else:
+            nivel, tipo_alerta, prefixo = "amarelo", "warning", "Receita estável"
+        sinal_pct = "+" if delta_pct > 0 else ""
+        sinal_val = "+" if delta_valor > 0 else ("-" if delta_valor < 0 else "")
+        pct_txt = f"{sinal_pct}{delta_pct:.1f}%".replace(".", ",")
+        valor_curto = f"{pct_txt} ({sinal_val}{moeda(abs(delta_valor), cfg)})"
+        titulo = f"{prefixo} ({rotulo})"
+        resumo = f"{rot_atual}: {moeda(rec_atual, cfg)} vs. {rot_ant}: {moeda(rec_ant, cfg)} ({valor_curto})."
+    elif rec_atual > 0:
+        nivel, tipo_alerta = "verde", "success"
+        valor_curto = f"+{moeda(rec_atual, cfg)}"
+        titulo = f"Nova receita registrada ({rotulo})"
+        resumo = f"{rot_atual}: {moeda(rec_atual, cfg)} frente a {rot_ant} sem entradas ({moeda(0.0, cfg)})."
+    else:
+        nivel, tipo_alerta = "neutro", "info"
+        valor_curto = moeda(0.0, cfg)
+        titulo = f"Sem variação ({rotulo})"
+        resumo = f"{rot_atual} e {rot_ant} sem receitas registradas."
+
+    return {
+        "chave": chave,
+        "rotulo": rotulo,
+        "disponivel": True,
+        "rec_atual": rec_atual,
+        "rec_anterior": rec_ant,
+        "delta_valor": round(delta_valor, 2),
+        "delta_pct": round(delta_pct, 2) if delta_pct is not None else None,
+        "nivel": nivel,
+        "tipo_alerta": tipo_alerta,
+        "titulo": titulo,
+        "resumo": resumo,
+        "valor_curto": valor_curto,
+    }
+
+
+def comparativo_receita_empresa(e: pd.DataFrame, cfg: dict | None = None, hoje: date | None = None) -> dict:
+    """Compara aumento ou perda de receita recente da própria empresa conforme limites e períodos configurados."""
+    cfg_ef = {**PADROES, **(cfg or {})}
+    if not cfg_ef.get("rec_cmp_ativo", True):
+        return {
+            "ativo": False,
+            "sem_dados": False,
+            "max_meses": int(cfg_ef.get("rec_cmp_max_meses", 12) or 12),
+            "comparacoes": [],
+            "principal": None,
+            "nivel": "neutro",
+            "tipo_alerta": "info",
+            "titulo": "Comparativo próprio de receita desativado",
+            "resumo": "Ative em Configurações > Eficiência para comparar a evolução de receitas da empresa.",
+        }
+
+    max_meses = max(1, int(cfg_ef.get("rec_cmp_max_meses", 12) or 12))
+    presets = (
+        ("mes", "rec_cmp_mes", 1, "Mês passado"),
+        ("30d", "rec_cmp_30d", 1, "Últimos 30 dias"),
+        ("6m", "rec_cmp_6m", 6, "6 meses atrás"),
+        ("ano", "rec_cmp_ano", 12, "Ano passado"),
+    )
+    ativos = [(ch, m_atras, rot) for ch, cfg_k, m_atras, rot in presets if cfg_ef.get(cfg_k, True) and m_atras <= max_meses]
+    if not ativos:
+        return {
+            "ativo": True,
+            "sem_dados": False,
+            "max_meses": max_meses,
+            "comparacoes": [],
+            "principal": None,
+            "nivel": "neutro",
+            "tipo_alerta": "info",
+            "titulo": "Nenhum tipo de data habilitado dentro do alcance configurado",
+            "resumo": f"Ajuste os períodos em Configurações > Eficiência (alcance atual: até {max_meses} mês(es) atrás).",
+        }
+
+    if e.empty or "data" not in e or "valor" not in e:
+        return {
+            "ativo": True,
+            "sem_dados": True,
+            "max_meses": max_meses,
+            "comparacoes": [],
+            "principal": None,
+            "nivel": "neutro",
+            "tipo_alerta": "info",
+            "titulo": "Sem receitas lançadas para comparação",
+            "resumo": "Cadastre receitas em 'Adicionar dados' para acompanhar o aumento ou perda de receita.",
+        }
+
+    df = e.copy()
+    df["_dt"] = df["data"].apply(parse_date)
+    df["_val"] = pd.to_numeric(df["valor"], errors="coerce").fillna(0.0)
+    df = df[df["_dt"].notna()]
+    if df.empty:
+        return {
+            "ativo": True,
+            "sem_dados": True,
+            "max_meses": max_meses,
+            "comparacoes": [],
+            "principal": None,
+            "nivel": "neutro",
+            "tipo_alerta": "info",
+            "titulo": "Sem receitas com data válida para comparação",
+            "resumo": "Verifique as datas dos lançamentos em 'Adicionar dados'.",
+        }
+
+    dt_ref: date = hoje or df["_dt"].max()
+    mes_ref = dt_ref.strftime("%Y-%m")
+    df["_ym"] = df["_dt"].apply(lambda d: d.strftime("%Y-%m"))
+    somas_mes = df.groupby("_ym")["_val"].sum().to_dict()
+    min_dt: date = df["_dt"].min()
+    min_ym: str = min_dt.strftime("%Y-%m")
+
+    fmt_ym = lambda ym: f"{ym[5:]}/{ym[:4]}"
+    comparacoes: list[dict] = []
+    for ch, m_atras, rotulo in ativos:
+        if ch == "30d":
+            ini_at = dt_ref - timedelta(days=29)
+            fim_an = dt_ref - timedelta(days=30)
+            ini_an = dt_ref - timedelta(days=59)
+            rec_at = float(df.loc[(df["_dt"] >= ini_at) & (df["_dt"] <= dt_ref), "_val"].sum())
+            rec_an = float(df.loc[(df["_dt"] >= ini_an) & (df["_dt"] <= fim_an), "_val"].sum())
+            comp = _avaliar_variacao_receita(
+                ch,
+                rotulo,
+                f"Últimos 30 dias ({ini_at:%d/%m}–{dt_ref:%d/%m})",
+                f"30 dias anteriores ({ini_an:%d/%m}–{fim_an:%d/%m})",
+                rec_at,
+                rec_an,
+                bool(min_dt <= fim_an),
+                "Sem receitas lançadas há mais de 30 dias para comparar.",
+                cfg_ef,
+            )
+        else:
+            ym_an = _subtrair_meses(mes_ref, m_atras)
+            rec_at = float(somas_mes.get(mes_ref, 0.0))
+            rec_an = float(somas_mes.get(ym_an, 0.0))
+            comp = _avaliar_variacao_receita(
+                ch,
+                rotulo,
+                f"Mês {fmt_ym(mes_ref)}",
+                f"Mês {fmt_ym(ym_an)}",
+                rec_at,
+                rec_an,
+                bool(min_ym <= ym_an),
+                f"Sem histórico até {fmt_ym(ym_an)} para comparar com {rotulo.lower()}.",
+                cfg_ef,
+            )
+        comparacoes.append(comp)
+
+    principal = next((c for c in comparacoes if c["disponivel"]), comparacoes[0])
+    return {
+        "ativo": True,
+        "sem_dados": False,
+        "max_meses": max_meses,
+        "comparacoes": comparacoes,
+        "principal": principal,
+        "nivel": principal["nivel"],
+        "tipo_alerta": principal["tipo_alerta"],
+        "titulo": principal["titulo"],
+        "resumo": principal["resumo"],
     }
 
 

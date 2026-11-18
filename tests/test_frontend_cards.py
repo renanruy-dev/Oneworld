@@ -8,7 +8,18 @@ from unittest.mock import patch
 try:
     os.environ["QT_QPA_PLATFORM"] = "offscreen"
     from PyQt6.QtCore import QEvent
-    from PyQt6.QtWidgets import QApplication, QComboBox, QFrame, QGridLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QTabWidget
+    from PyQt6.QtWidgets import (
+        QApplication,
+        QCheckBox,
+        QComboBox,
+        QFrame,
+        QGridLayout,
+        QLabel,
+        QLineEdit,
+        QMessageBox,
+        QPushButton,
+        QTabWidget,
+    )
     _qt_app = QApplication.instance() or QApplication(["-platform", "offscreen"])
     from oneworld import database as db
     from oneworld.frontend import BarChartWidget, MetricCard, MultiSelectChips, OneWorldWindow
@@ -532,4 +543,76 @@ class TestTelaAdicionarDadosCards(unittest.TestCase):
         self.assertEqual(kpis["Rendimento Líquido"], "R$ 3.000,00")
         self.assertNotIn("Estoque Central · Unidades", kpis)
         self.assertNotIn("Aluguel · Despesa lançada", kpis)
+
+    def test_configuracoes_e_comparativo_proprio_receita_dashboard(self):
+        db.inserir_lote(
+            "eventos",
+            [
+                {"data": "2025-11-10", "cliente": "Ano Ant", "local": "M", "convidados": 0, "valor": 2000.0, "status": "Confirmado"},
+                {"data": "2026-05-10", "cliente": "Seis M", "local": "M", "convidados": 0, "valor": 1000.0, "status": "Confirmado"},
+                {"data": "2026-10-15", "cliente": "Mes Ant", "local": "M", "convidados": 0, "valor": 1000.0, "status": "Confirmado"},
+                {"data": "2026-11-15", "cliente": "Mes Atual", "local": "M", "convidados": 0, "valor": 1500.0, "status": "Confirmado"},
+            ],
+        )
+        self.win.navegar_para("Dashboard")
+        self._flush()
+        kpis = self._mapa_kpis_dashboard()
+        self.assertIn("Mês passado", kpis)
+        self.assertIn("Últimos 30 dias", kpis)
+        self.assertIn("6 meses atrás", kpis)
+        self.assertIn("Ano passado", kpis)
+        self.assertIn("+50,0%", kpis["Mês passado"])
+        self.assertIn("-25,0%", kpis["Ano passado"])
+
+        # Abre Configurações > Eficiência e ajusta alcance e checkboxes
+        self.win.estado["tab_config"] = 1
+        self.win.navegar_para("Configurações")
+        self._flush()
+        aba_efic = self._pagina().findChild(QTabWidget).widget(1)
+
+        chks = {c.text(): c for c in aba_efic.findChildren(QCheckBox)}
+        chk_ativo = chks["Ativar comparativo próprio de aumento/perda de receita no Dashboard"]
+        chk_6m = chks["Mês recente vs. 6 meses atrás"]
+        chk_ano = chks["Mês recente vs. Ano passado (12 meses atrás)"]
+        self.assertTrue(chk_ativo.isChecked())
+        self.assertTrue(chk_6m.isChecked())
+        self.assertTrue(chk_ano.isChecked())
+
+        # Desmarca Ano passado e limita alcance para 3 meses
+        chk_ano.setChecked(False)
+        combos = aba_efic.findChildren(QComboBox)
+        cb_max = next(c for c in combos if c.findData(3) >= 0 and c.findData(12) >= 0)
+        cb_max.setCurrentIndex(cb_max.findData(3))
+        self._flush()
+        self.assertFalse(chk_6m.isEnabled())
+        self.assertFalse(chk_ano.isEnabled())
+
+        btn_salvar = next(b for b in self._pagina().findChildren(QPushButton) if b.text() == "Salvar alterações")
+        btn_salvar.click()
+        self._flush()
+
+        # Volta ao Dashboard e confirma que apenas Mês passado e Últimos 30 dias aparecem
+        self.win.navegar_para("Dashboard")
+        self._flush()
+        kpis2 = self._mapa_kpis_dashboard()
+        self.assertIn("Mês passado", kpis2)
+        self.assertIn("Últimos 30 dias", kpis2)
+        self.assertNotIn("6 meses atrás", kpis2)
+        self.assertNotIn("Ano passado", kpis2)
+
+        # Desativa comparativo próprio completamente
+        self.win.estado["tab_config"] = 1
+        self.win.navegar_para("Configurações")
+        self._flush()
+        aba_efic = self._pagina().findChild(QTabWidget).widget(1)
+        chks = {c.text(): c for c in aba_efic.findChildren(QCheckBox)}
+        chks["Ativar comparativo próprio de aumento/perda de receita no Dashboard"].setChecked(False)
+        next(b for b in self._pagina().findChildren(QPushButton) if b.text() == "Salvar alterações").click()
+        self._flush()
+
+        self.win.navegar_para("Dashboard")
+        self._flush()
+        kpis3 = self._mapa_kpis_dashboard()
+        self.assertNotIn("Mês passado", kpis3)
+        self.assertNotIn("Últimos 30 dias", kpis3)
 

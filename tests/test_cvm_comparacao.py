@@ -287,18 +287,15 @@ def test_ui_dados_externos_e_dashboard_persistem_estado(ambiente_cvm, tmp_path, 
         ger._ao_excluir(id_21, "DFP CVM 2021")
         assert len(cvm_cmp.carregar_estado_cvm()["bases"]) == 2
 
-        # Habilita comparação e volta ao Dashboard
+        # Habilita comparação em Dados Externos e volta ao Dashboard
+        ger.chk_ativa.setChecked(True)
         janela.navegar_para("Dashboard")
         painel = janela.cvm_painel_negocio
-        painel.chk_habilitar.setChecked(True)
         assert not painel.corpo.isHidden()
-        assert len(painel._checks_bases) == 2
-
-        # Filtro visual no Dashboard
-        painel.ed_filtro.setText("Mercado Consolidado")
-        chks_vis = [c for c in painel._checks_bases.values() if not c.isHidden()]
-        assert len(chks_vis) == 1
-        painel.ed_filtro.setText("")
+        assert painel.lay_di.count() > 0
+        # Não deve exibir filtro nem lista de checkboxes de seleção de bases no Dashboard
+        assert painel.findChildren(frontend.QCheckBox) == []
+        assert painel.findChildren(frontend.QLineEdit) == []
 
         # Verifica geração do Markdown com bloco CVM ativo
         bloco = cvm_cmp.avaliar_decision_intelligence(
@@ -322,3 +319,29 @@ def test_ui_dados_externos_e_dashboard_persistem_estado(ambiente_cvm, tmp_path, 
     finally:
         janela2.close()
         janela2.deleteLater()
+
+
+def test_cvm_ativado_por_dados_externos_sem_campo_duplicado_no_dashboard(ambiente_cvm, tmp_path):
+    z22 = _criar_zip_cvm(tmp_path / "dfp_cia_aberta_2022.zip", 2022, 2000.0, 1000.0, -1000.0, 1000.0, 400.0)
+    cvm_cmp.adicionar_bases_cvm([z22])
+
+    janela = frontend.OneWorldWindow()
+    try:
+        painel = janela.cvm_painel_negocio
+        # O checkbox duplicado não é exibido no layout do Dashboard
+        assert painel.chk_habilitar.isHidden()
+        assert painel.isHidden()
+
+        # Ativa na aba Dados Externos
+        janela.navegar_para("Dados Externos")
+        janela.cvm_gerenciador.chk_ativa.setChecked(True)
+
+        # Volta ao Dashboard: já está ativo e visível automaticamente
+        janela.navegar_para("Dashboard")
+        painel = janela.cvm_painel_negocio
+        assert not painel.isHidden()
+        assert not painel.corpo.isHidden()
+        assert painel.chk_habilitar.isChecked()
+    finally:
+        janela.close()
+        janela.deleteLater()

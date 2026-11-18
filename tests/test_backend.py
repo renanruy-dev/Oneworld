@@ -134,3 +134,80 @@ def test_gerar_markdown():
     md = bk.gerar_markdown(e, cv, config)
     assert "# OneWorld" in md
     assert "Empresa Alfa" in md
+
+
+def test_comparativo_receita_aumento_perda_e_estabilidade():
+    # Mês recente 2026-11 = 15000 vs 2026-10 = 10000 (+50%), 2026-05 = 15000 (0%), 2025-11 = 20000 (-25%)
+    e = pd.DataFrame([
+        {"data": "2025-11-10", "cliente": "Ano Ant", "valor": 20000.0},
+        {"data": "2026-05-12", "cliente": "Seis M", "valor": 15000.0},
+        {"data": "2026-10-15", "cliente": "Mes Ant", "valor": 10000.0},
+        {"data": "2026-11-15", "cliente": "Mes Atual", "valor": 15000.0},
+    ])
+    res = bk.comparativo_receita_empresa(e, cfg.PADROES, hoje=date(2026, 11, 18))
+    assert res["ativo"] is True
+    assert res["nivel"] == "verde"
+    mapa = {c["chave"]: c for c in res["comparacoes"]}
+    assert set(mapa.keys()) == {"mes", "30d", "6m", "ano"}
+
+    assert mapa["mes"]["delta_pct"] == 50.0
+    assert mapa["mes"]["delta_valor"] == 5000.0
+    assert mapa["mes"]["nivel"] == "verde"
+
+    assert mapa["6m"]["delta_pct"] == 0.0
+    assert mapa["6m"]["nivel"] == "amarelo"
+
+    assert mapa["ano"]["delta_pct"] == -25.0
+    assert mapa["ano"]["delta_valor"] == -5000.0
+    assert mapa["ano"]["nivel"] == "vermelho"
+
+    assert mapa["30d"]["disponivel"] is True
+    assert mapa["30d"]["rec_atual"] == 15000.0
+    assert mapa["30d"]["rec_anterior"] == 10000.0
+
+
+def test_comparativo_receita_respeita_config_e_alcance():
+    e = pd.DataFrame([
+        {"data": "2025-11-10", "cliente": "Ano Ant", "valor": 20000.0},
+        {"data": "2026-05-12", "cliente": "Seis M", "valor": 12000.0},
+        {"data": "2026-10-15", "cliente": "Mes Ant", "valor": 10000.0},
+        {"data": "2026-11-15", "cliente": "Mes Atual", "valor": 8000.0},
+    ])
+    # Limita alcance a 3 meses -> bloqueia 6 meses e Ano passado
+    c1 = {**cfg.PADROES, "rec_cmp_max_meses": 3}
+    r1 = bk.comparativo_receita_empresa(e, c1, hoje=date(2026, 11, 18))
+    chaves1 = [c["chave"] for c in r1["comparacoes"]]
+    assert chaves1 == ["mes", "30d"]
+    assert r1["nivel"] == "vermelho"
+    assert r1["principal"]["delta_pct"] == -20.0
+
+    # Alcance 12 meses, mas desabilitando ano passado e 30 dias
+    c2 = {**cfg.PADROES, "rec_cmp_max_meses": 12, "rec_cmp_ano": False, "rec_cmp_30d": False}
+    r2 = bk.comparativo_receita_empresa(e, c2, hoje=date(2026, 11, 18))
+    assert [c["chave"] for c in r2["comparacoes"]] == ["mes", "6m"]
+
+    # Comparativo totalmente desativado
+    c3 = {**cfg.PADROES, "rec_cmp_ativo": False}
+    r3 = bk.comparativo_receita_empresa(e, c3, hoje=date(2026, 11, 18))
+    assert r3["ativo"] is False
+    assert r3["comparacoes"] == []
+
+
+def test_comparativo_receita_sem_historico_suficiente_e_base_zero():
+    # Apenas 1 lançamento recente -> não inventa variação percentual para mês anterior
+    e_curto = pd.DataFrame([{"data": "2026-11-10", "cliente": "Unico", "valor": 5000.0}])
+    res = bk.comparativo_receita_empresa(e_curto, cfg.PADROES, hoje=date(2026, 11, 18))
+    assert res["ativo"] is True
+    assert all(not c["disponivel"] for c in res["comparacoes"])
+
+    # Mês anterior com 0, mas existe histórico anterior (2026-09 teve receita)
+    e_zero = pd.DataFrame([
+        {"data": "2026-09-05", "cliente": "Antigo", "valor": 1000.0},
+        {"data": "2026-11-10", "cliente": "Atual", "valor": 3000.0},
+    ])
+    res_z = bk.comparativo_receita_empresa(e_zero, cfg.PADROES, hoje=date(2026, 11, 18))
+    mes_cmp = next(c for c in res_z["comparacoes"] if c["chave"] == "mes")
+    assert mes_cmp["disponivel"] is True
+    assert mes_cmp["delta_pct"] is None
+    assert mes_cmp["delta_valor"] == 3000.0
+    assert mes_cmp["nivel"] == "verde"

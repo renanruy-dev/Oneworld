@@ -609,6 +609,10 @@ def definir_bases_selecionadas(ids: Sequence[str]) -> dict[str, Any]:
             vistos.add(sid)
             limpos.append(sid)
     estado["selecionadas"] = limpos
+    if limpos:
+        estado["ativa"] = True
+    elif not limpos and estado.get("ativa"):
+        estado["ativa"] = False
     return _salvar_estado_cvm(estado)
 
 

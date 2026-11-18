@@ -454,7 +454,7 @@ def _fmt_pct_cvm(valor) -> str:
 
 
 class CVMComparacaoPainel(QFrame):
-    """Painel de controle multi-base CVM (habilitar, filtrar/selecionar) e Decision Intelligence."""
+    """Painel de exibição da comparação CVM e Decision Intelligence no Dashboard/BI."""
 
     estado_alterado = pyqtSignal()
 
@@ -463,8 +463,6 @@ class CVMComparacaoPainel(QFrame):
         self.setObjectName("OwCard")
         self.cfg = cfg
         self._obter_resumo = obter_resumo_negocio
-        self._checks_bases: dict[str, QCheckBox] = {}
-        self._nomes_busca: dict[str, str] = {}
 
         lay = QVBoxLayout(self)
         lay.setContentsMargins(16, 12, 16, 12)
@@ -494,31 +492,8 @@ class CVMComparacaoPainel(QFrame):
         self.lay_corpo.setContentsMargins(0, 4, 0, 0)
         self.lay_corpo.setSpacing(10)
 
-        barra_filtro = QHBoxLayout()
-        barra_filtro.setSpacing(8)
-        self.ed_filtro = QLineEdit()
-        self.ed_filtro.setPlaceholderText("Filtrar bases CVM por nome ou ano...")
-        self.ed_filtro.textChanged.connect(self._aplicar_filtro_visual)
-        barra_filtro.addWidget(self.ed_filtro, stretch=1)
-
-        self.btn_todas = QPushButton("Selecionar todas")
-        self.btn_todas.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_todas.clicked.connect(self._selecionar_todas)
-        barra_filtro.addWidget(self.btn_todas)
-
-        self.btn_recente = QPushButton("Apenas mais recente")
-        self.btn_recente.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_recente.clicked.connect(self._selecionar_mais_recente)
-        barra_filtro.addWidget(self.btn_recente)
-        self.lay_corpo.addLayout(barra_filtro)
-
-        self.lay_checks = QVBoxLayout()
-        self.lay_checks.setContentsMargins(2, 2, 2, 2)
-        self.lay_checks.setSpacing(4)
-        self.lay_corpo.addLayout(self.lay_checks)
-
         self.lay_di = QVBoxLayout()
-        self.lay_di.setContentsMargins(0, 4, 0, 0)
+        self.lay_di.setContentsMargins(0, 0, 0, 0)
         self.lay_di.setSpacing(8)
         self.lay_corpo.addLayout(self.lay_di)
 
@@ -530,35 +505,8 @@ class CVMComparacaoPainel(QFrame):
         self.atualizar()
         self.estado_alterado.emit()
 
-    def _ao_mudar_selecao(self):
-        ids = [bid for bid, chk in self._checks_bases.items() if chk.isChecked()]
-        cvm_cmp.definir_bases_selecionadas(ids)
-        self._renderizar_di(cvm_cmp.carregar_estado_cvm())
-        self.estado_alterado.emit()
-
-    def _selecionar_todas(self):
-        estado = cvm_cmp.carregar_estado_cvm()
-        ids = [b["id"] for b in estado.get("bases", [])]
-        cvm_cmp.definir_bases_selecionadas(ids)
-        self.atualizar()
-        self.estado_alterado.emit()
-
-    def _selecionar_mais_recente(self):
-        estado = cvm_cmp.carregar_estado_cvm()
-        ord_bases = cvm_cmp.ordenar_bases_recentes(estado.get("bases", []))
-        ids = [ord_bases[0]["id"]] if ord_bases else []
-        cvm_cmp.definir_bases_selecionadas(ids)
-        self.atualizar()
-        self.estado_alterado.emit()
-
-    def _aplicar_filtro_visual(self):
-        termo = bk.sem_acento(self.ed_filtro.text())
-        for bid, chk in self._checks_bases.items():
-            alvo = self._nomes_busca.get(bid, "")
-            chk.setVisible(not termo or termo in alvo)
-
     def atualizar(self):
-        """Recarrega o estado persistido do SQLite e atualiza seletores e Decision Intelligence."""
+        """Recarrega o estado persistido do SQLite e atualiza o painel de Decision Intelligence."""
         estado = cvm_cmp.carregar_estado_cvm()
         ativa = bool(estado.get("ativa"))
 
@@ -568,35 +516,6 @@ class CVMComparacaoPainel(QFrame):
 
         self.setVisible(ativa)
         self.corpo.setVisible(ativa)
-        _limpar_layout_widgets(self.lay_checks)
-        self._checks_bases.clear()
-        self._nomes_busca.clear()
-
-        bases_ord = cvm_cmp.ordenar_bases_recentes(estado.get("bases", []))
-        sel = set(estado.get("selecionadas") or [])
-
-        if not bases_ord:
-            lbl_vazio = QLabel("Nenhuma base CVM cadastrada. Adicione na página 'Dados Externos'.")
-            lbl_vazio.setObjectName("Caption")
-            self.lay_checks.addWidget(lbl_vazio)
-        else:
-            for idx, base in enumerate(bases_ord):
-                res = base.get("resumo") or {}
-                ano = base.get("ano_referencia") or res.get("ano_referencia") or "n/d"
-                cias = int(res.get("companhias_analisadas") or res.get("total_companhias") or 0)
-                tag_rec = "  ·  Mais recente (Referência principal)" if idx == 0 else ""
-                nome = base.get("nome") or base.get("arquivo_padrao") or "CVM"
-                chk = QCheckBox(f"{nome} — Exercício {ano} ({cias} cias){tag_rec}")
-                chk.setCursor(Qt.CursorShape.PointingHandCursor)
-                chk.setChecked(base["id"] in sel)
-                chk.toggled.connect(lambda _c: self._ao_mudar_selecao())
-                self._checks_bases[base["id"]] = chk
-                self._nomes_busca[base["id"]] = bk.sem_acento(
-                    f"{nome} {base.get('arquivo_padrao', '')} {ano}"
-                )
-                self.lay_checks.addWidget(chk)
-
-        self._aplicar_filtro_visual()
         self._renderizar_di(estado)
 
     def _renderizar_di(self, estado: dict):
@@ -1307,6 +1226,11 @@ class OneWorldWindow(QMainWindow):
             cfg["perfil_negocio"] = PERFIL_PADRAO
         if not isinstance(cfg.get("rotulos_custom"), dict):
             cfg["rotulos_custom"] = {}
+        try:
+            max_m = int(cfg.get("rec_cmp_max_meses", 12))
+        except (TypeError, ValueError):
+            max_m = 12
+        cfg["rec_cmp_max_meses"] = max(1, max_m)
         return cfg
 
     def vocab(self) -> dict:
@@ -1587,6 +1511,9 @@ class OneWorldWindow(QMainWindow):
         cap.setObjectName("Caption")
         container_lay.addWidget(cap)
 
+        # ── 2a. Comparativo Próprio de Receita (Aumento / Perda recente da empresa) ──
+        self._montar_painel_receita_propria(container_lay, bk.filtrar_eventos(e, "Todos", stat_atual))
+
         # ── 2b. Comparação CVM & Decision Intelligence ──
         self.cvm_painel_negocio = CVMComparacaoPainel(
             self.cfg,
@@ -1728,6 +1655,49 @@ class OneWorldWindow(QMainWindow):
             )
         )
         container_lay.addWidget(card_tab)
+
+    def _abrir_config_comparativo(self):
+        self.estado["tab_config"] = 1
+        self.navegar_para("Configurações")
+
+    def _montar_painel_receita_propria(self, container_lay: QVBoxLayout, df_rec: pd.DataFrame):
+        res = bk.comparativo_receita_empresa(df_rec, self.cfg)
+        if not res["ativo"]:
+            return
+
+        card = QFrame()
+        card.setObjectName("OwCard")
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(16, 14, 16, 14)
+        lay.setSpacing(10)
+
+        cab = QHBoxLayout()
+        cab.setSpacing(10)
+        cab.addWidget(self._subtitulo("📈 Comparativo Próprio de Receita (Dados Recentes da Empresa)"))
+        cab.addStretch(1)
+        lbl_alc = QLabel(f"Alcance: até {res['max_meses']} mês(es) atrás")
+        lbl_alc.setObjectName("Caption")
+        cab.addWidget(lbl_alc)
+        btn_cfg = QPushButton("Configurar períodos")
+        btn_cfg.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_cfg.clicked.connect(self._abrir_config_comparativo)
+        cab.addWidget(btn_cfg)
+        lay.addLayout(cab)
+
+        lay.addWidget(AlertBox(f"{res['titulo']}: {res['resumo']}", res["tipo_alerta"]))
+
+        comparacoes = res.get("comparacoes") or []
+        if comparacoes:
+            linha_cmp = QHBoxLayout()
+            linha_cmp.setSpacing(12)
+            for cmp_item in comparacoes:
+                mc = MetricCard(cmp_item["rotulo"], cmp_item["valor_curto"])
+                mc.setMinimumHeight(76)
+                mc.setToolTip(cmp_item["resumo"])
+                linha_cmp.addWidget(mc)
+            lay.addLayout(linha_cmp)
+
+        container_lay.addWidget(card)
 
     def _coletar_campos_dashboard(self, f_ev: pd.DataFrame, cv: pd.DataFrame, dg: pd.DataFrame) -> list[dict]:
         """Reúne os campos de Dados Gerais, Receitas e Despesas com configuração de exibição no Dashboard."""
@@ -3424,6 +3394,72 @@ class OneWorldWindow(QMainWindow):
         l_efic.addWidget(chk_filt)
         l_efic.addWidget(chk_lemb)
 
+        l_efic.addWidget(Divider())
+        l_efic.addWidget(self._subtitulo("Comparativo Próprio de Receita (Dashboard)"))
+        cap_rec = QLabel(
+            "Defina o alcance máximo no tempo e quais tipos de datas o sistema pode comparar "
+            "para detectar aumento ou perda de receita da própria empresa."
+        )
+        cap_rec.setObjectName("Caption")
+        cap_rec.setWordWrap(True)
+        l_efic.addWidget(cap_rec)
+
+        chk_rec_ativo = QCheckBox("Ativar comparativo próprio de aumento/perda de receita no Dashboard")
+        chk_rec_ativo.setChecked(bool(cfg.get("rec_cmp_ativo", True)))
+        l_efic.addWidget(chk_rec_ativo)
+
+        form_rec = QFormLayout()
+        cb_rec_max = QComboBox()
+        alcances = [
+            ("1 mês atrás (30 dias)", 1),
+            ("Até 3 meses atrás", 3),
+            ("Até 6 meses atrás", 6),
+            ("Até 12 meses atrás (1 ano)", 12),
+            ("Até 24 meses atrás (2 anos)", 24),
+        ]
+        for rot_alc, val_alc in alcances:
+            cb_rec_max.addItem(rot_alc, userData=val_alc)
+        max_atual = int(cfg.get("rec_cmp_max_meses", 12) or 12)
+        idx_alc = cb_rec_max.findData(max_atual)
+        cb_rec_max.setCurrentIndex(idx_alc if idx_alc >= 0 else 3)
+        form_rec.addRow("Quão para trás comparar", cb_rec_max)
+        l_efic.addLayout(form_rec)
+
+        lbl_tipos = QLabel("<b>Tipos de períodos habilitados na comparação:</b>")
+        l_efic.addWidget(lbl_tipos)
+
+        chk_rec_30d = QCheckBox("Últimos 30 dias vs. 30 dias anteriores")
+        chk_rec_30d.setChecked(bool(cfg.get("rec_cmp_30d", True)))
+        chk_rec_mes = QCheckBox("Mês recente vs. Mês passado (1 mês atrás)")
+        chk_rec_mes.setChecked(bool(cfg.get("rec_cmp_mes", True)))
+        chk_rec_6m = QCheckBox("Mês recente vs. 6 meses atrás")
+        chk_rec_6m.setChecked(bool(cfg.get("rec_cmp_6m", True)))
+        chk_rec_ano = QCheckBox("Mês recente vs. Ano passado (12 meses atrás)")
+        chk_rec_ano.setChecked(bool(cfg.get("rec_cmp_ano", True)))
+
+        for w_chk in (chk_rec_30d, chk_rec_mes, chk_rec_6m, chk_rec_ano):
+            l_efic.addWidget(w_chk)
+
+        def atualizar_estado_rec_cmp():
+            ativo = chk_rec_ativo.isChecked()
+            max_m = int(cb_rec_max.currentData() or 12)
+            cfg["rec_cmp_ativo"] = ativo
+            cfg["rec_cmp_max_meses"] = max_m
+            cb_rec_max.setEnabled(ativo)
+            chk_rec_30d.setEnabled(ativo and max_m >= 1)
+            chk_rec_mes.setEnabled(ativo and max_m >= 1)
+            chk_rec_6m.setEnabled(ativo and max_m >= 6)
+            chk_rec_ano.setEnabled(ativo and max_m >= 12)
+
+        chk_rec_ativo.toggled.connect(lambda _: atualizar_estado_rec_cmp())
+        cb_rec_max.currentIndexChanged.connect(lambda _: atualizar_estado_rec_cmp())
+        chk_rec_30d.toggled.connect(lambda val: cfg.__setitem__("rec_cmp_30d", bool(val)))
+        chk_rec_mes.toggled.connect(lambda val: cfg.__setitem__("rec_cmp_mes", bool(val)))
+        chk_rec_6m.toggled.connect(lambda val: cfg.__setitem__("rec_cmp_6m", bool(val)))
+        chk_rec_ano.toggled.connect(lambda val: cfg.__setitem__("rec_cmp_ano", bool(val)))
+        atualizar_estado_rec_cmp()
+
+        l_efic.addWidget(Divider())
         cap_at = QLabel("Atalhos de teclado (N, /, D) estão planejados e ainda não funcionam nesta versão.")
         cap_at.setObjectName("Caption")
         l_efic.addWidget(cap_at)

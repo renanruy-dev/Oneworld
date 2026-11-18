@@ -170,6 +170,12 @@ PADROES = {
     "moeda": "BRL",
     "perfil_negocio": PERFIL_PADRAO,
     "rotulos_custom": {},
+    "rec_cmp_ativo": True,
+    "rec_cmp_30d": True,
+    "rec_cmp_mes": True,
+    "rec_cmp_6m": True,
+    "rec_cmp_ano": True,
+    "rec_cmp_max_meses": 12,
 }
 
 # Chaves internas fixas de rota (garantem navegação estável independentemente do nome exibido no menu)
