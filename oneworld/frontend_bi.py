@@ -6,6 +6,7 @@ gráficos dinâmicos (barras, linhas, histograma) e exportação.
 from __future__ import annotations
 
 import math
+import sqlite3
 from csv import Error as ErroCSV
 from hashlib import sha256
 from io import BytesIO
@@ -46,7 +47,14 @@ from .analises import preparar_grafico
 from .filtros import aplicar_filtros
 from .fontes_sqlite import carregar_tabela, listar_tabelas
 from .formatacao import formatar_valor_kpi
-from .frontend import AlertBox, Divider, ExpanderWidget, MetricCard, PaginatedTableWidget
+from .frontend import (
+    AlertBox,
+    CVMComparacaoPainel,
+    Divider,
+    ExpanderWidget,
+    MetricCard,
+    PaginatedTableWidget,
+)
 from .indicadores import OPERACOES, calcular_kpi
 from .metadados import ErroBI, configurar_datas, inspecionar_colunas
 from .tema import paleta_atual
@@ -82,7 +90,7 @@ class BIChartWidget(QFrame):
         self._cor = QColor(cor)
         self._cfg = cfg
         self._moeda = formato_moeda
-        self.setMinimumHeight(240)
+        self.setMinimumHeight(280)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
 
         self._dados: list[tuple[str, float]] = []
@@ -223,9 +231,10 @@ class BIDashboardWidget(QWidget):
 
     dados_atualizados = pyqtSignal()
 
-    def __init__(self, cfg: dict | None = None, parent=None):
+    def __init__(self, cfg: dict | None = None, parent=None, carregar_exemplos: bool = True):
         super().__init__(parent)
         self.cfg = cfg or {"cor": "#5B4FC4", "cor2": "#00A86B", "linhas": 10}
+        self._carregar_exemplos_iniciais = carregar_exemplos
 
         self.fontes_disponiveis: dict[str, Path | tuple | pd.DataFrame] = {}
         self.df_bruto: pd.DataFrame | None = None
@@ -251,19 +260,45 @@ class BIDashboardWidget(QWidget):
         if self.fontes_disponiveis:
             primeira = list(self.fontes_disponiveis.keys())[0]
             self.selecionar_fonte(primeira)
+        else:
+            self._atualizar_visibilidade_estado()
 
     def _iniciar_fontes(self):
         self.fontes_disponiveis.clear()
+        if self._carregar_exemplos_iniciais and EXEMPLOS.exists():
+            for p in sorted(EXEMPLOS.glob("*.csv")):
+                self.fontes_disponiveis[f"Exemplo: {p.stem}"] = p
+
+    def carregar_exemplos_demo(self):
+        """Carrega os conjuntos de exemplo sob demanda do usuário."""
         if EXEMPLOS.exists():
             for p in sorted(EXEMPLOS.glob("*.csv")):
                 self.fontes_disponiveis[f"Exemplo: {p.stem}"] = p
+        self._atualizar_combo_fontes()
+        if self.fontes_disponiveis:
+            primeira = list(self.fontes_disponiveis.keys())[0]
+            self.cb_dataset.setCurrentText(primeira)
+            self.selecionar_fonte(primeira)
+
+    def _atualizar_visibilidade_estado(self):
+        tem_dados = self.df_tipado is not None
+        if hasattr(self, "card_vazio"):
+            self.card_vazio.setVisible(not tem_dados)
+        if hasattr(self, "conteudo_analise"):
+            self.conteudo_analise.setVisible(tem_dados)
 
     def _construir_ui(self):
         self.lay_principal = QVBoxLayout(self)
         self.lay_principal.setContentsMargins(0, 0, 0, 0)
         self.lay_principal.setSpacing(14)
 
-        # ── 1. Barra Superior: Seleção de Dados ──
+        # ── 1. Barra Superior: Seleção de Dados (Card Toolbar) ──
+        card_fonte = QFrame()
+        card_fonte.setObjectName("ToolbarCard")
+        lay_card_fonte = QVBoxLayout(card_fonte)
+        lay_card_fonte.setContentsMargins(16, 12, 16, 12)
+        lay_card_fonte.setSpacing(6)
+
         barra_dados = QHBoxLayout()
         barra_dados.setSpacing(12)
 
@@ -272,6 +307,7 @@ class BIDashboardWidget(QWidget):
         barra_dados.addWidget(lbl_fonte)
 
         self.cb_dataset = QComboBox()
+        self.cb_dataset.setPlaceholderText("Selecione ou adicione uma fonte de dados...")
         self.cb_dataset.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._atualizar_combo_fontes()
         self.cb_dataset.currentTextChanged.connect(self._ao_mudar_fonte)
@@ -282,126 +318,102 @@ class BIDashboardWidget(QWidget):
         barra_dados.addWidget(self.chk_banco)
 
         btn_upload = QPushButton("+ Adicionar arquivo")
+        btn_upload.setObjectName("PrimaryBtn")
         btn_upload.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_upload.clicked.connect(self._ao_fazer_upload)
         barra_dados.addWidget(btn_upload)
 
-        self.lay_principal.addLayout(barra_dados)
+        lay_card_fonte.addLayout(barra_dados)
 
         self.lbl_caption = QLabel(
-            "Escolha os dados e configure a análise. Arquivos e configurações da análise ficam nesta sessão local."
+            "Escolha uma tabela do banco local ou importe arquivos (CSV, Excel, JSON) para explorar indicadores e gráficos."
         )
         self.lbl_caption.setObjectName("Caption")
-        self.lay_principal.addWidget(self.lbl_caption)
+        lay_card_fonte.addWidget(self.lbl_caption)
+
+        self.lay_principal.addWidget(card_fonte)
+
+        self.cvm_painel = CVMComparacaoPainel(
+            self.cfg,
+            self._obter_resumo_negocio_seguro,
+            parent=self,
+        )
+        self.lay_principal.addWidget(self.cvm_painel)
 
         self.caixa_alerta = AlertBox("", "warning")
         self.caixa_alerta.setVisible(False)
         self.lay_principal.addWidget(self.caixa_alerta)
 
-        # ── 2. Tipagem de datas ──
-        self.expander_datas = ExpanderWidget("Tipos de colunas e datas", aberto=False)
-        self.lbl_info_colunas = QLabel()
-        self.lbl_info_colunas.setObjectName("Caption")
-        self.expander_datas.corpo_layout.addWidget(self.lbl_info_colunas)
+        # ── Estado Vazio (quando nenhum dataset foi carregado) ──
+        self.card_vazio = QFrame()
+        self.card_vazio.setObjectName("EmptyStateCard")
+        lay_vazio = QVBoxLayout(self.card_vazio)
+        lay_vazio.setContentsMargins(28, 32, 28, 32)
+        lay_vazio.setSpacing(10)
 
-        linha_datas = QHBoxLayout()
-        linha_datas.addWidget(QLabel("Coluna para data:"))
-        self.cb_col_data = QComboBox()
-        linha_datas.addWidget(self.cb_col_data, stretch=1)
+        lbl_vt = QLabel("Nenhuma fonte de dados selecionada no Explorador BI")
+        lbl_vt.setObjectName("EmptyTitle")
+        lbl_vt.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lay_vazio.addWidget(lbl_vt)
 
-        linha_datas.addWidget(QLabel("Formato:"))
-        self.ed_formato_data = QLineEdit("%Y-%m-%d")
-        self.ed_formato_data.setFixedWidth(110)
-        linha_datas.addWidget(self.ed_formato_data)
+        lbl_vd = QLabel(
+            "O módulo de BI inicia limpo, sem conjuntos fictícios pré-carregados.\n"
+            "Adicione uma planilha/arquivo externo ou habilite a leitura das tabelas do banco local."
+        )
+        lbl_vd.setObjectName("Caption")
+        lbl_vd.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        lbl_vd.setWordWrap(True)
+        lay_vazio.addWidget(lbl_vd)
 
-        btn_aplicar_data = QPushButton("Interpretar como data")
-        btn_aplicar_data.clicked.connect(self._ao_aplicar_datas)
-        linha_datas.addWidget(btn_aplicar_data)
-        self.expander_datas.corpo_layout.addLayout(linha_datas)
+        linha_bv = QHBoxLayout()
+        linha_bv.addStretch(1)
 
-        self.lbl_falhas_data = QLabel()
-        self.lbl_falhas_data.setObjectName("Caption")
-        self.lbl_falhas_data.setStyleSheet("color: #C0392B;")
-        self.expander_datas.corpo_layout.addWidget(self.lbl_falhas_data)
+        btn_v_arq = QPushButton("+ Adicionar arquivo (CSV / XLSX / JSON)")
+        btn_v_arq.setObjectName("PrimaryBtn")
+        btn_v_arq.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_v_arq.clicked.connect(self._ao_fazer_upload)
+        linha_bv.addWidget(btn_v_arq)
 
-        self.lay_principal.addWidget(self.expander_datas)
+        btn_v_db = QPushButton("Carregar tabelas do banco local")
+        btn_v_db.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_v_db.clicked.connect(lambda: self.chk_banco.setChecked(True))
+        linha_bv.addWidget(btn_v_db)
 
-        # ── 3. Filtros Dinâmicos ──
-        self.expander_filtros = ExpanderWidget("Filtros configuráveis", aberto=True)
-        self.lay_filtros_itens = QVBoxLayout()
-        self.expander_filtros.corpo_layout.addLayout(self.lay_filtros_itens)
+        btn_v_demo = QPushButton("Carregar dados de demonstração")
+        btn_v_demo.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_v_demo.clicked.connect(self.carregar_exemplos_demo)
+        linha_bv.addWidget(btn_v_demo)
 
-        linha_rodape_filtros = QHBoxLayout()
-        self.lbl_status_filtros = QLabel("0 de 0 registros após os filtros.")
-        self.lbl_status_filtros.setObjectName("Caption")
-        linha_rodape_filtros.addWidget(self.lbl_status_filtros)
-        linha_rodape_filtros.addStretch(1)
+        linha_bv.addStretch(1)
+        lay_vazio.addSpacing(6)
+        lay_vazio.addLayout(linha_bv)
+        self.lay_principal.addWidget(self.card_vazio)
 
-        btn_limpar_filtros = QPushButton("Limpar filtros")
-        btn_limpar_filtros.clicked.connect(self.limpar_filtros)
-        linha_rodape_filtros.addWidget(btn_limpar_filtros)
-        self.expander_filtros.corpo_layout.addLayout(linha_rodape_filtros)
+        # ── Container de Análise Ativa (exibido quando há dataset carregado) ──
+        self.conteudo_analise = QWidget()
+        lay_analise = QVBoxLayout(self.conteudo_analise)
+        lay_analise.setContentsMargins(0, 0, 0, 0)
+        lay_analise.setSpacing(14)
 
-        self.lay_principal.addWidget(self.expander_filtros)
-
-        # ── 4. KPIs ──
+        # ── 2. Faixa de KPIs em Destaque no Topo ──
         self.lay_kpi_cards = QHBoxLayout()
         self.lay_kpi_cards.setSpacing(12)
-        self.lay_principal.addLayout(self.lay_kpi_cards)
+        lay_analise.addLayout(self.lay_kpi_cards)
 
-        self.expander_kpi_cfg = ExpanderWidget("Configurar KPIs", aberto=False)
-        linha_n_kpis = QHBoxLayout()
-        linha_n_kpis.addWidget(QLabel("Quantidade de KPIs (1 a 4):"))
-        self.sp_n_kpis = QSpinBox()
-        self.sp_n_kpis.setRange(1, 4)
-        self.sp_n_kpis.setValue(1)
-        self.sp_n_kpis.valueChanged.connect(self._ao_mudar_qtd_kpis)
-        linha_n_kpis.addWidget(self.sp_n_kpis)
-        linha_n_kpis.addStretch(1)
-        self.expander_kpi_cfg.corpo_layout.addLayout(linha_n_kpis)
+        # ── 3. Palco Principal: Gráfico Configurável em Card Dedicado ──
+        card_graf = QFrame()
+        card_graf.setObjectName("OwCard")
+        lay_card_graf = QVBoxLayout(card_graf)
+        lay_card_graf.setContentsMargins(16, 14, 16, 14)
+        lay_card_graf.setSpacing(12)
 
-        self.kpi_form_widgets: list[dict] = []
-        for i in range(4):
-            f_frame = QFrame()
-            f_lay = QHBoxLayout(f_frame)
-            f_lay.setContentsMargins(0, 4, 0, 4)
-
-            ed_tit = QLineEdit(f"KPI {i + 1}")
-            ed_tit.setFixedWidth(130)
-            cb_op = QComboBox()
-            for op in OPERACOES:
-                cb_op.addItem(ROTULOS[op], userData=op)
-            cb_col = QComboBox()
-            cb_fmt = QComboBox()
-            cb_fmt.addItems(["Número", "Percentual", "Moeda"])
-            ed_simb = QLineEdit("R$")
-            ed_simb.setFixedWidth(50)
-
-            idx_k = i
-            ed_tit.textChanged.connect(lambda t, k=idx_k: self._ao_mudar_kpi_campo(k, "titulo", t))
-            cb_op.currentIndexChanged.connect(lambda _, k=idx_k: self._ao_mudar_kpi_campo(k, "operacao", cb_op.currentData()))
-            cb_col.currentIndexChanged.connect(lambda _, k=idx_k: self._ao_mudar_kpi_campo(k, "coluna", cb_col.currentText()))
-            cb_fmt.currentTextChanged.connect(lambda f, k=idx_k: self._ao_mudar_kpi_campo(k, "formato", f))
-            ed_simb.textChanged.connect(lambda s, k=idx_k: self._ao_mudar_kpi_campo(k, "simbolo", s))
-
-            f_lay.addWidget(QLabel(f"#{i+1}:"))
-            f_lay.addWidget(ed_tit)
-            f_lay.addWidget(cb_op)
-            f_lay.addWidget(cb_col)
-            f_lay.addWidget(cb_fmt)
-            f_lay.addWidget(ed_simb)
-
-            f_frame.setVisible(i == 0)
-            self.expander_kpi_cfg.corpo_layout.addWidget(f_frame)
-            self.kpi_form_widgets.append({
-                "frame": f_frame, "titulo": ed_tit, "op": cb_op, "col": cb_col, "fmt": cb_fmt, "simb": ed_simb
-            })
-
-        self.lay_principal.addWidget(self.expander_kpi_cfg)
-
-        # ── 5. Gráfico Configurável ──
-        self.lay_principal.addWidget(QLabel("Gráfico configurável"))
         barra_graf = QHBoxLayout()
+        barra_graf.setSpacing(10)
+        lbl_tit_graf = QLabel("Gráfico analítico")
+        lbl_tit_graf.setObjectName("SectionTitle")
+        barra_graf.addWidget(lbl_tit_graf)
+        barra_graf.addStretch(1)
+
         barra_graf.addWidget(QLabel("Tipo:"))
         self.cb_graf_tipo = QComboBox()
         self.cb_graf_tipo.currentTextChanged.connect(self._ao_mudar_grafico_tipo)
@@ -442,19 +454,125 @@ class BIDashboardWidget(QWidget):
         self.sp_graf_bins.valueChanged.connect(lambda v: self._ao_mudar_grafico_campo("intervalos", v))
         barra_graf.addWidget(self.sp_graf_bins)
 
-        self.lay_principal.addLayout(barra_graf)
+        lay_card_graf.addLayout(barra_graf)
 
         self.lay_grafico_container = QVBoxLayout()
-        self.lay_principal.addLayout(self.lay_grafico_container)
+        lay_card_graf.addLayout(self.lay_grafico_container)
 
-        self.expander_dados_grafico = ExpanderWidget("Dados do gráfico", aberto=False)
+        self.expander_dados_grafico = ExpanderWidget("Dados agregados do gráfico", aberto=False)
         self.lay_dados_grafico = QVBoxLayout()
         self.expander_dados_grafico.corpo_layout.addLayout(self.lay_dados_grafico)
-        self.lay_principal.addWidget(self.expander_dados_grafico)
+        lay_card_graf.addWidget(self.expander_dados_grafico)
 
-        # ── 6. Registros Filtrados e Exportação ──
+        lay_analise.addWidget(card_graf)
+
+        # ── 4. Gavetas de Configuração (Filtros, KPIs e Datas recolhidas por padrão) ──
+        self.expander_filtros = ExpanderWidget("Filtros configuráveis", aberto=False)
+        self.lay_filtros_itens = QGridLayout()
+        self.lay_filtros_itens.setHorizontalSpacing(18)
+        self.lay_filtros_itens.setVerticalSpacing(8)
+        self.expander_filtros.corpo_layout.addLayout(self.lay_filtros_itens)
+
+        linha_rodape_filtros = QHBoxLayout()
+        self.lbl_status_filtros = QLabel("0 de 0 registros após os filtros.")
+        self.lbl_status_filtros.setObjectName("Caption")
+        linha_rodape_filtros.addWidget(self.lbl_status_filtros)
+        linha_rodape_filtros.addStretch(1)
+
+        btn_limpar_filtros = QPushButton("Limpar filtros")
+        btn_limpar_filtros.clicked.connect(self.limpar_filtros)
+        linha_rodape_filtros.addWidget(btn_limpar_filtros)
+        self.expander_filtros.corpo_layout.addLayout(linha_rodape_filtros)
+        lay_analise.addWidget(self.expander_filtros)
+
+        self.expander_kpi_cfg = ExpanderWidget("Configurar KPIs (1 a 4 indicadores)", aberto=False)
+        linha_n_kpis = QHBoxLayout()
+        linha_n_kpis.addWidget(QLabel("Quantidade de KPIs visíveis (1 a 4):"))
+        self.sp_n_kpis = QSpinBox()
+        self.sp_n_kpis.setRange(1, 4)
+        self.sp_n_kpis.setValue(1)
+        self.sp_n_kpis.valueChanged.connect(self._ao_mudar_qtd_kpis)
+        linha_n_kpis.addWidget(self.sp_n_kpis)
+        linha_n_kpis.addStretch(1)
+        self.expander_kpi_cfg.corpo_layout.addLayout(linha_n_kpis)
+
+        self.kpi_form_widgets: list[dict] = []
+        for i in range(4):
+            f_frame = QFrame()
+            f_lay = QHBoxLayout(f_frame)
+            f_lay.setContentsMargins(0, 4, 0, 4)
+
+            ed_tit = QLineEdit(f"KPI {i + 1}")
+            ed_tit.setFixedWidth(140)
+            cb_op = QComboBox()
+            for op in OPERACOES:
+                cb_op.addItem(ROTULOS[op], userData=op)
+            cb_col = QComboBox()
+            cb_fmt = QComboBox()
+            cb_fmt.addItems(["Número", "Percentual", "Moeda"])
+            ed_simb = QLineEdit("R$")
+            ed_simb.setFixedWidth(55)
+
+            idx_k = i
+            ed_tit.textChanged.connect(lambda t, k=idx_k: self._ao_mudar_kpi_campo(k, "titulo", t))
+            cb_op.currentIndexChanged.connect(lambda _, k=idx_k: self._ao_mudar_kpi_campo(k, "operacao", cb_op.currentData()))
+            cb_col.currentIndexChanged.connect(lambda _, k=idx_k: self._ao_mudar_kpi_campo(k, "coluna", cb_col.currentText()))
+            cb_fmt.currentTextChanged.connect(lambda f, k=idx_k: self._ao_mudar_kpi_campo(k, "formato", f))
+            ed_simb.textChanged.connect(lambda s, k=idx_k: self._ao_mudar_kpi_campo(k, "simbolo", s))
+
+            f_lay.addWidget(QLabel(f"#{i+1}:"))
+            f_lay.addWidget(ed_tit)
+            f_lay.addWidget(cb_op)
+            f_lay.addWidget(cb_col)
+            f_lay.addWidget(cb_fmt)
+            f_lay.addWidget(ed_simb)
+
+            self.expander_kpi_cfg.corpo_layout.addWidget(f_frame)
+            f_frame.setVisible(i == 0)
+            self.kpi_form_widgets.append({
+                "frame": f_frame, "titulo": ed_tit, "op": cb_op, "col": cb_col, "fmt": cb_fmt, "simb": ed_simb
+            })
+
+        lay_analise.addWidget(self.expander_kpi_cfg)
+
+        self.expander_datas = ExpanderWidget("Tipos de colunas e datas", aberto=False)
+        self.lbl_info_colunas = QLabel()
+        self.lbl_info_colunas.setObjectName("Caption")
+        self.expander_datas.corpo_layout.addWidget(self.lbl_info_colunas)
+
+        linha_datas = QHBoxLayout()
+        linha_datas.addWidget(QLabel("Coluna para data:"))
+        self.cb_col_data = QComboBox()
+        linha_datas.addWidget(self.cb_col_data, stretch=1)
+
+        linha_datas.addWidget(QLabel("Formato:"))
+        self.ed_formato_data = QLineEdit("%Y-%m-%d")
+        self.ed_formato_data.setFixedWidth(110)
+        linha_datas.addWidget(self.ed_formato_data)
+
+        btn_aplicar_data = QPushButton("Interpretar como data")
+        btn_aplicar_data.clicked.connect(self._ao_aplicar_datas)
+        linha_datas.addWidget(btn_aplicar_data)
+        self.expander_datas.corpo_layout.addLayout(linha_datas)
+
+        self.lbl_falhas_data = QLabel()
+        self.lbl_falhas_data.setObjectName("Caption")
+        self.lbl_falhas_data.setStyleSheet("color: #C0392B;")
+        self.expander_datas.corpo_layout.addWidget(self.lbl_falhas_data)
+
+        lay_analise.addWidget(self.expander_datas)
+
+        # ── 5. Registros Filtrados e Exportação em Card Dedicado ──
+        card_tabela = QFrame()
+        card_tabela.setObjectName("OwCard")
+        lay_card_tab = QVBoxLayout(card_tabela)
+        lay_card_tab.setContentsMargins(16, 14, 16, 14)
+        lay_card_tab.setSpacing(10)
+
         linha_tabela_tit = QHBoxLayout()
-        linha_tabela_tit.addWidget(QLabel("Registros filtrados"))
+        lbl_reg = QLabel("Registros filtrados")
+        lbl_reg.setObjectName("SectionTitle")
+        linha_tabela_tit.addWidget(lbl_reg)
         linha_tabela_tit.addStretch(1)
 
         btn_exportar = QPushButton("Exportar dados filtrados (CSV)")
@@ -462,10 +580,13 @@ class BIDashboardWidget(QWidget):
         btn_exportar.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_exportar.clicked.connect(self._ao_exportar_csv)
         linha_tabela_tit.addWidget(btn_exportar)
-        self.lay_principal.addLayout(linha_tabela_tit)
+        lay_card_tab.addLayout(linha_tabela_tit)
 
         self.lay_tabela_container = QVBoxLayout()
-        self.lay_principal.addLayout(self.lay_tabela_container)
+        lay_card_tab.addLayout(self.lay_tabela_container)
+        lay_analise.addWidget(card_tabela)
+
+        self.lay_principal.addWidget(self.conteudo_analise)
 
     # ── Métodos de dados e seleção ──
     def _atualizar_combo_fontes(self):
@@ -497,6 +618,15 @@ class BIDashboardWidget(QWidget):
             except (ErroSQLite, OSError, ValueError):
                 self._mostrar_aviso("Não foi possível abrir o banco local para leitura.")
         self._atualizar_combo_fontes()
+        if checked and self.df_tipado is None and self.fontes_disponiveis:
+            primeira = list(self.fontes_disponiveis.keys())[0]
+            self.cb_dataset.setCurrentText(primeira)
+            self.selecionar_fonte(primeira)
+        elif not self.fontes_disponiveis:
+            self.df_bruto = None
+            self.df_tipado = None
+            self.df_filtrado = pd.DataFrame()
+            self._atualizar_visibilidade_estado()
 
     def _ao_fazer_upload(self):
         arquivos, _ = QFileDialog.getOpenFileNames(
@@ -562,7 +692,10 @@ class BIDashboardWidget(QWidget):
             self.df_bruto = None
             self.df_tipado = None
             self.df_filtrado = pd.DataFrame()
+            self._atualizar_visibilidade_estado()
             return
+
+        self._atualizar_visibilidade_estado()
 
         # Reseta configurações de filtro e opções de KPI/gráfico para o novo dataset
         self.filtros_ativos.clear()
@@ -643,6 +776,7 @@ class BIDashboardWidget(QWidget):
             return
 
         self.filtro_widgets: dict[str, dict] = {}
+        idx_grid = 0
         for nome, col in self.meta.items():
             if col.tipo not in ("categoria", "numero", "data"):
                 continue
@@ -672,14 +806,14 @@ class BIDashboardWidget(QWidget):
 
                 sp_max = QDoubleSpinBox()
                 sp_max.setRange(-1e12, 1e12)
-                sp_max.setValue(1e12)
+                sp_max.setValue(-1e12)
                 sp_max.setSpecialValueText("Máx")
                 sp_max.setEnabled(False)
 
                 linha.addWidget(QLabel("De:"))
-                linha.addWidget(sp_min)
+                linha.addWidget(sp_min, stretch=1)
                 linha.addWidget(QLabel("Até:"))
-                linha.addWidget(sp_max)
+                linha.addWidget(sp_max, stretch=1)
                 ctrl_info["min"] = sp_min
                 ctrl_info["max"] = sp_max
                 sp_min.valueChanged.connect(lambda _: self._ao_filtro_alterado())
@@ -698,9 +832,9 @@ class BIDashboardWidget(QWidget):
                 de_max.setEnabled(False)
 
                 linha.addWidget(QLabel("De:"))
-                linha.addWidget(de_min)
+                linha.addWidget(de_min, stretch=1)
                 linha.addWidget(QLabel("Até:"))
-                linha.addWidget(de_max)
+                linha.addWidget(de_max, stretch=1)
                 ctrl_info["min"] = de_min
                 ctrl_info["max"] = de_max
                 de_min.dateChanged.connect(lambda _: self._ao_filtro_alterado())
@@ -720,7 +854,8 @@ class BIDashboardWidget(QWidget):
 
             chk_ativo.toggled.connect(ao_ativar)
             self.filtro_widgets[nome] = ctrl_info
-            self.lay_filtros_itens.addLayout(linha)
+            self.lay_filtros_itens.addLayout(linha, idx_grid // 2, idx_grid % 2)
+            idx_grid += 1
 
     def _ao_filtro_alterado(self):
         self.filtros_ativos.clear()
@@ -736,7 +871,7 @@ class BIDashboardWidget(QWidget):
                 v_min = ctrl["min"].value()
                 v_max = ctrl["max"].value()
                 cfg["minimo"] = v_min if v_min != -1e12 else None
-                cfg["maximo"] = v_max if v_max != 1e12 else None
+                cfg["maximo"] = v_max if v_max not in (-1e12, 1e12) else None
             elif tipo == "data":
                 cfg["minimo"] = ctrl["min"].date().toString("yyyy-MM-dd")
                 cfg["maximo"] = ctrl["max"].date().toString("yyyy-MM-dd")
@@ -932,6 +1067,11 @@ class BIDashboardWidget(QWidget):
         total = len(self.df_tipado)
         filtrados = len(self.df_filtrado)
         self.lbl_status_filtros.setText(f"{filtrados} de {total} registros após os filtros.")
+        if hasattr(self, "expander_filtros"):
+            n_f = len(self.filtros_ativos)
+            self.expander_filtros.definir_titulo(
+                f"Filtros configuráveis ({n_f} ativo{'s' if n_f != 1 else ''})" if n_f else "Filtros configuráveis"
+            )
 
         self._renderizar_kpis()
         self._renderizar_grafico()
@@ -1046,6 +1186,20 @@ class BIDashboardWidget(QWidget):
         self.df_filtrado.to_csv(caminho, index=False, encoding="utf-8-sig")
 
     # ── Métodos para suporte a testes e leitura de estado ──
+    def _obter_resumo_negocio_seguro(self) -> dict:
+        if not database.DB_PATH.exists():
+            return {}
+        try:
+            e = database.carregar("eventos")
+            cv = database.carregar("convidados")
+            return backend.resumo_financeiro(e, cv)
+        except sqlite3.Error:
+            return {}
+
+    def atualizar_comparacao_cvm(self):
+        if hasattr(self, "cvm_painel"):
+            self.cvm_painel.atualizar()
+
     def obter_df_filtrado(self) -> pd.DataFrame:
         return self.df_filtrado.copy()
 

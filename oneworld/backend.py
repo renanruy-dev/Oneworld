@@ -130,6 +130,46 @@ def filtrar_eventos(e, mes="Todos", status=()):
     return f
 
 
+def resumo_financeiro(e: pd.DataFrame, cv: pd.DataFrame) -> dict:
+    """Calcula receita bruta, custos diretos, despesas detalhadas, gasto total, rendimento líquido e margem."""
+    receita = float(e["valor"].sum()) if not e.empty and "valor" in e else 0.0
+    custos_dir = float(e["convidados"].sum()) if not e.empty and "convidados" in e else 0.0
+    if not cv.empty and "acompanhantes" in cv:
+        cv_validos = cv[cv["confirmacao"] != "Recusou"] if "confirmacao" in cv else cv
+        despesas_det = float(cv_validos["acompanhantes"].sum())
+    else:
+        cv_validos = pd.DataFrame()
+        despesas_det = 0.0
+    gasto_total = custos_dir + despesas_det
+    rendimento = receita - gasto_total
+    margem = (rendimento / receita * 100.0) if receita > 0 else 0.0
+
+    partes_cat: dict[str, float] = {}
+    if not cv_validos.empty:
+        for _, r in cv_validos.iterrows():
+            cat = texto(r.get("mesa")) or "Geral / Outros"
+            val = float(r.get("acompanhantes", 0) or 0)
+            if val > 0:
+                partes_cat[cat] = partes_cat.get(cat, 0.0) + val
+    if custos_dir > 0:
+        partes_cat["Custos Diretos"] = partes_cat.get("Custos Diretos", 0.0) + custos_dir
+    serie_gastos = (
+        pd.Series(partes_cat, dtype=float).sort_values(ascending=False)
+        if partes_cat
+        else pd.Series(dtype=float)
+    )
+
+    return {
+        "receita_bruta": receita,
+        "custos_diretos": custos_dir,
+        "despesas_detalhadas": despesas_det,
+        "gasto_total": gasto_total,
+        "rendimento_liquido": rendimento,
+        "margem_pct": margem,
+        "gastos_por_categoria": serie_gastos,
+    }
+
+
 def lembretes(e, hoje=None, dias=7):
     """Registros não concluídos que acontecem nos próximos `dias` dias."""
     hoje = hoje or date.today()
@@ -245,32 +285,44 @@ def responder_ia(pergunta, e, cv, cfg):
     ent2_p = v["ent2_plural"].lower()
     rot_qtd = v["metric_qtd"].lower()
     p = sem_acento(pergunta)
-    if e.empty:
+    if e.empty and cv.empty:
         return "Não existem dados suficientes para análise."
     m = lambda val: moeda(val, cfg)  # noqa: E731
-    if re.search(r"\b(mes|meses|periodo)\b", p):
+    if any(k in p for k in ["gasto", "despesa", "custo", "lucro", "rendimento", "margem", "saldo"]):
+        fin = resumo_financeiro(e, cv)
+        return (
+            f"Resumo financeiro: Receita Bruta de {m(fin['receita_bruta'])}, "
+            f"Gasto Total de {m(fin['gasto_total'])} "
+            f"(Custos Diretos {m(fin['custos_diretos'])} + Despesas {m(fin['despesas_detalhadas'])}), "
+            f"Rendimento Líquido de {m(fin['rendimento_liquido'])} "
+            f"(margem de {fin['margem_pct']:.1f}%)."
+        )
+    if re.search(r"\b(mes|meses|periodo)\b", p) and not e.empty:
         por_mes = e.assign(mes=pd.to_datetime(e["data"]).dt.strftime("%m/%Y")).groupby("mes")["valor"].sum()
         return f"{v['metric_valor']} por mês: " + "; ".join(f"{k}: {m(val)}" for k, val in por_mes.items()) + "."
-    if any(k in p for k in ["receita", "valor", "faturamento", "orcamento"]):
+    if any(k in p for k in ["receita", "valor", "faturamento", "orcamento"]) and not e.empty:
         top = e.sort_values("valor", ascending=False).iloc[0]
         return (f"O total de {v['metric_valor'].lower()} é {m(e['valor'].sum())}, média de "
                 f"{m(e['valor'].mean())} por registro. O maior valor registrado é de "
                 f"{top['cliente']} ({m(top['valor'])}).")
     if any(k in p for k in ["convidado", "cadastro", "cliente", "item", "volume", "quantidade"]):
         conf = int((cv["confirmacao"] == "Confirmado").sum()) if not cv.empty else 0
-        return (f"O total acumulado de {rot_qtd} é {int(e['convidados'].sum())}; "
+        qtd_ev = int(e["convidados"].sum()) if not e.empty else 0
+        return (f"O total acumulado de {rot_qtd} é {qtd_ev}; "
                 f"{conf} de {len(cv)} registros em {ent2_p} estão com situação confirmada.")
-    if "pendente" in p or "planejamento" in p or "aberto" in p:
+    if ("pendente" in p or "planejamento" in p or "aberto" in p) and not e.empty:
         pend = e[e["status"].isin(["Pendente", "Em planejamento"])]
         return f"Há {len(pend)} registro(s) pendentes ou em planejamento em {ent1_p}: " + (
             ", ".join(pend["cliente"]) if len(pend) else "nenhum.")
-    if "confirm" in p:
+    if "confirm" in p and not e.empty:
         return f"Existem {int((e['status'] == 'Confirmado').sum())} registros confirmados de {len(e)} em {ent1_p}."
-    return (f"Resumo ({cfg.get('perfil_negocio', '')}): {len(e)} registros em {ent1_p}, "
-            f"{int(e['convidados'].sum())} em {rot_qtd} e {m(e['valor'].sum())} em {v['metric_valor'].lower()}.")
+    fin = resumo_financeiro(e, cv)
+    return (f"Resumo ({cfg.get('perfil_negocio', '')}): {len(e)} registros em {ent1_p} "
+            f"({m(fin['receita_bruta'])}), {len(cv)} registros em {ent2_p} "
+            f"(gasto total {m(fin['gasto_total'])}) e rendimento líquido de {m(fin['rendimento_liquido'])}.")
 
 
-def gerar_markdown(e, cv, cfg):
+def gerar_markdown(e, cv, cfg, bloco_cvm: str = ""):
     v = obter_vocabulario(cfg)
     ev = formatar(e.drop(columns=["id"]), "eventos", cfg)
     cvf = formatar(cv.drop(columns=["id"]), "convidados", cfg)
@@ -281,9 +333,10 @@ def gerar_markdown(e, cv, cfg):
         f"- {v['metric_valor']}: {moeda(e['valor'].sum(), cfg)}",
         f"- {v['metric_ent2_conf']}: {int((cv['confirmacao'] == 'Confirmado').sum())} de {len(cv)}",
     ]
+    secao_cvm = f"\n{bloco_cvm}" if bloco_cvm else ""
     return (f"# {cfg['nome']} — exportação de dados\n\n"
             f"Gerado em {datetime.now():%d/%m/%Y %H:%M}\n\n## Resumo\n" + "\n".join(resumo) +
-            f"\n\n## {v['ent1_plural']}\n{md_tabela(ev)}\n## {v['ent2_plural']}\n{md_tabela(cvf)}\n"
+            f"{secao_cvm}\n\n## {v['ent1_plural']}\n{md_tabela(ev)}\n## {v['ent2_plural']}\n{md_tabela(cvf)}\n"
             "## Sugestão de prompt para IA externa\n"
             "Analise os dados acima, destaque padrões e riscos (ex.: registros pendentes, concentração de "
             "valores por período) e sugira alternativas estratégicas. Não invente dados que não estejam nas tabelas.\n")

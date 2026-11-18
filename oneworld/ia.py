@@ -10,6 +10,7 @@ from datetime import date, datetime
 
 import pandas as pd
 
+from . import backend as bk
 from . import database as db
 from . import dfp
 from .config import RAIZ
@@ -52,6 +53,11 @@ def indicadores_negocio(e, cv, hoje=None):
         out.append(f"Convidados cadastrados: {len(cv)} (taxa de confirmação {_pct(conf / len(cv)).lstrip('+')}); "
                    f"{int(cv['acompanhantes'].sum())} acompanhantes; cadastrados x previstos nos eventos: "
                    f"{len(cv)} de {int(e['convidados'].sum())}.")
+    fin = bk.resumo_financeiro(e, cv)
+    out.append(f"Resumo financeiro: receita bruta {_brl(fin['receita_bruta'])}, "
+               f"gasto total {_brl(fin['gasto_total'])} (custos diretos {_brl(fin['custos_diretos'])} + "
+               f"despesas {_brl(fin['despesas_detalhadas'])}), rendimento líquido estimado "
+               f"{_brl(fin['rendimento_liquido'])} (margem {fin['margem_pct']:.1f}%).")
     return out
 
 
@@ -105,8 +111,8 @@ _MAX_CONTEXTO = 30000  # caracteres de contexto enviados ao modelo
 
 def _system_prompt():
     a1 = dfp.anos()[0] if dfp.DFP_DB_PATH.is_file() else "?"
-    return f"""Você é o assistente de negócios do OneWorld: apoia o gestor na TOMADA DE DECISÕES de uma operação de \
-eventos, usando (a) os dados do próprio negócio e (b) a base DFP da CVM como referência de mercado. Hoje é \
+    return f"""Você é o assistente de negócios do OneWorld: apoia o gestor na TOMADA DE DECISÕES financeiras, controle de gastos, receitas e rendimento do negócio, \
+usando (a) os dados do próprio negócio e (b) a base DFP da CVM como referência de mercado. Hoje é \
 {date.today():%d/%m/%Y}. Responda em português do Brasil.
 
 Como responder:

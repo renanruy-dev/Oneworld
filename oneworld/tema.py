@@ -145,6 +145,26 @@ def gerar_qss(cfg):
         border: 1px solid {p['border']};
         border-radius: 12px;
     }}
+    QFrame#ToolbarCard {{
+        background-color: {p['surface']};
+        border: 1px solid {p['border']};
+        border-radius: 12px;
+    }}
+    QFrame#EmptyStateCard {{
+        background-color: {p['surface']};
+        border: 1px dashed {p['border']};
+        border-radius: 14px;
+    }}
+    QFrame#SidebarEnvCard {{
+        background-color: {p['bg']};
+        border: 1px solid {p['border']};
+        border-radius: 10px;
+    }}
+    QLabel#EmptyTitle {{
+        font-size: {fs_sub + 2}px;
+        font-weight: 700;
+        color: {p['text']};
+    }}
     /* Alertas / Banners */
     QFrame#AlertInfo {{
         background-color: {p['surface']};

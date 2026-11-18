@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import html
 import math
+import sqlite3
 import sys
+import zipfile
 from datetime import date, datetime
 from pathlib import Path
 
@@ -46,6 +48,7 @@ from PyQt6.QtWidgets import (
 
 from . import backend as bk
 from . import backup as bkp
+from . import cvm_comparacao as cvm_cmp
 from . import database as db
 from . import ia
 from . import mapeamento as mp
@@ -177,6 +180,10 @@ class ExpanderWidget(QFrame):
 
     def alternar(self):
         self._aberto = not self._aberto
+        self._atualizar_estado()
+
+    def definir_titulo(self, novo_titulo: str):
+        self._titulo = novo_titulo
         self._atualizar_estado()
 
     def _atualizar_estado(self):
@@ -422,6 +429,541 @@ class PaginatedTableWidget(QWidget):
         altura_ideal = min(460, 42 + len(fatia) * 36)
         self.tabela.setMinimumHeight(altura_ideal)
         self.lbl_info.setText(f"Exibindo {ini + 1}–{fim} de {len(self._df)} registros")
+
+
+def _limpar_layout_widgets(layout) -> None:
+    """Remove widgets e sublayouts de um layout Qt sem depender da janela principal."""
+    while layout.count():
+        item = layout.takeAt(0)
+        w = item.widget()
+        if w:
+            w.deleteLater()
+        elif item.layout():
+            _limpar_layout_widgets(item.layout())
+
+
+def _fmt_pct_cvm(valor) -> str:
+    if valor is None:
+        return "n/d"
+    try:
+        return f"{float(valor):.1f}%".replace(".", ",")
+    except (TypeError, ValueError):
+        return "n/d"
+
+
+class CVMComparacaoPainel(QFrame):
+    """Painel de controle multi-base CVM (habilitar, filtrar/selecionar) e Decision Intelligence."""
+
+    estado_alterado = pyqtSignal()
+
+    def __init__(self, cfg: dict, obter_resumo_negocio, parent=None):
+        super().__init__(parent)
+        self.setObjectName("OwCard")
+        self.cfg = cfg
+        self._obter_resumo = obter_resumo_negocio
+        self._checks_bases: dict[str, QCheckBox] = {}
+        self._nomes_busca: dict[str, str] = {}
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(16, 12, 16, 12)
+        lay.setSpacing(10)
+
+        topo = QHBoxLayout()
+        topo.setSpacing(12)
+        self.chk_habilitar = QCheckBox(
+            "Habilitar comparação com base(s) pública(s) CVM (Decision Intelligence)"
+        )
+        self.chk_habilitar.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_habilitar.toggled.connect(self._ao_alternar_ativa)
+        topo.addWidget(self.chk_habilitar)
+        topo.addStretch(1)
+
+        self.lbl_status = QLabel()
+        self.lbl_status.setObjectName("Caption")
+        topo.addWidget(self.lbl_status)
+        lay.addLayout(topo)
+
+        self.corpo = QWidget()
+        self.lay_corpo = QVBoxLayout(self.corpo)
+        self.lay_corpo.setContentsMargins(0, 4, 0, 0)
+        self.lay_corpo.setSpacing(10)
+
+        barra_filtro = QHBoxLayout()
+        barra_filtro.setSpacing(8)
+        self.ed_filtro = QLineEdit()
+        self.ed_filtro.setPlaceholderText("Filtrar bases CVM por nome ou ano...")
+        self.ed_filtro.textChanged.connect(self._aplicar_filtro_visual)
+        barra_filtro.addWidget(self.ed_filtro, stretch=1)
+
+        self.btn_todas = QPushButton("Selecionar todas")
+        self.btn_todas.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_todas.clicked.connect(self._selecionar_todas)
+        barra_filtro.addWidget(self.btn_todas)
+
+        self.btn_recente = QPushButton("Apenas mais recente")
+        self.btn_recente.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_recente.clicked.connect(self._selecionar_mais_recente)
+        barra_filtro.addWidget(self.btn_recente)
+        self.lay_corpo.addLayout(barra_filtro)
+
+        self.lay_checks = QVBoxLayout()
+        self.lay_checks.setContentsMargins(2, 2, 2, 2)
+        self.lay_checks.setSpacing(4)
+        self.lay_corpo.addLayout(self.lay_checks)
+
+        self.lay_di = QVBoxLayout()
+        self.lay_di.setContentsMargins(0, 4, 0, 0)
+        self.lay_di.setSpacing(8)
+        self.lay_corpo.addLayout(self.lay_di)
+
+        lay.addWidget(self.corpo)
+        self.atualizar()
+
+    def _ao_alternar_ativa(self, checked: bool):
+        cvm_cmp.definir_comparacao_ativa(bool(checked))
+        self.atualizar()
+        self.estado_alterado.emit()
+
+    def _ao_mudar_selecao(self):
+        ids = [bid for bid, chk in self._checks_bases.items() if chk.isChecked()]
+        cvm_cmp.definir_bases_selecionadas(ids)
+        self._renderizar_di(cvm_cmp.carregar_estado_cvm())
+        self.estado_alterado.emit()
+
+    def _selecionar_todas(self):
+        estado = cvm_cmp.carregar_estado_cvm()
+        ids = [b["id"] for b in estado.get("bases", [])]
+        cvm_cmp.definir_bases_selecionadas(ids)
+        self.atualizar()
+        self.estado_alterado.emit()
+
+    def _selecionar_mais_recente(self):
+        estado = cvm_cmp.carregar_estado_cvm()
+        ord_bases = cvm_cmp.ordenar_bases_recentes(estado.get("bases", []))
+        ids = [ord_bases[0]["id"]] if ord_bases else []
+        cvm_cmp.definir_bases_selecionadas(ids)
+        self.atualizar()
+        self.estado_alterado.emit()
+
+    def _aplicar_filtro_visual(self):
+        termo = bk.sem_acento(self.ed_filtro.text())
+        for bid, chk in self._checks_bases.items():
+            alvo = self._nomes_busca.get(bid, "")
+            chk.setVisible(not termo or termo in alvo)
+
+    def atualizar(self):
+        """Recarrega o estado persistido do SQLite e atualiza seletores e Decision Intelligence."""
+        estado = cvm_cmp.carregar_estado_cvm()
+        ativa = bool(estado.get("ativa"))
+
+        self.chk_habilitar.blockSignals(True)
+        self.chk_habilitar.setChecked(ativa)
+        self.chk_habilitar.blockSignals(False)
+
+        self.corpo.setVisible(ativa)
+        _limpar_layout_widgets(self.lay_checks)
+        self._checks_bases.clear()
+        self._nomes_busca.clear()
+
+        bases_ord = cvm_cmp.ordenar_bases_recentes(estado.get("bases", []))
+        sel = set(estado.get("selecionadas") or [])
+
+        if not bases_ord:
+            lbl_vazio = QLabel("Nenhuma base CVM cadastrada. Adicione na página 'Dados Externos'.")
+            lbl_vazio.setObjectName("Caption")
+            self.lay_checks.addWidget(lbl_vazio)
+        else:
+            for idx, base in enumerate(bases_ord):
+                res = base.get("resumo") or {}
+                ano = base.get("ano_referencia") or res.get("ano_referencia") or "n/d"
+                cias = int(res.get("companhias_analisadas") or res.get("total_companhias") or 0)
+                tag_rec = "  ·  Mais recente (Referência principal)" if idx == 0 else ""
+                nome = base.get("nome") or base.get("arquivo_padrao") or "CVM"
+                chk = QCheckBox(f"{nome} — Exercício {ano} ({cias} cias){tag_rec}")
+                chk.setCursor(Qt.CursorShape.PointingHandCursor)
+                chk.setChecked(base["id"] in sel)
+                chk.toggled.connect(lambda _c: self._ao_mudar_selecao())
+                self._checks_bases[base["id"]] = chk
+                self._nomes_busca[base["id"]] = bk.sem_acento(
+                    f"{nome} {base.get('arquivo_padrao', '')} {ano}"
+                )
+                self.lay_checks.addWidget(chk)
+
+        self._aplicar_filtro_visual()
+        self._renderizar_di(estado)
+
+    def _renderizar_di(self, estado: dict):
+        _limpar_layout_widgets(self.lay_di)
+        if not estado.get("ativa"):
+            n_disp = len(estado.get("bases", []))
+            self.lbl_status.setText(f"Desativada ({n_disp} base(s) disponível(is))")
+            return
+
+        resumo_neg = self._obter_resumo() or {}
+        di = cvm_cmp.avaliar_decision_intelligence(resumo_neg, estado, self.cfg)
+        bases_usadas = di["bases_usadas"]
+        principal = di["base_principal"]
+
+        if principal:
+            ano_p = principal.get("ano_referencia") or "n/d"
+            self.lbl_status.setText(
+                f"Ativa · {len(bases_usadas)} base(s) · Principal: {principal.get('nome')} ({ano_p})"
+            )
+        else:
+            self.lbl_status.setText("Ativa · Nenhuma base selecionada")
+
+        sem = di.get("semaforo")
+        if sem:
+            self.lay_di.addWidget(AlertBox(f"{sem['titulo']}\n{sem['resumo']}", sem["tipo_alerta"]))
+
+        orientacoes = di.get("orientacoes") or []
+        inicio_extra = 1 if (not di.get("sem_bases") and orientacoes and sem and orientacoes[0]["texto"] == sem["resumo"]) else 0
+        for item in orientacoes[inicio_extra:]:
+            self.lay_di.addWidget(AlertBox(item["texto"], item["tipo"]))
+
+        if bases_usadas:
+            lbl_tab = QLabel("Bases CVM em comparação (ordenadas da mais recente para a mais antiga):")
+            lbl_tab.setObjectName("MetricLabel")
+            self.lay_di.addWidget(lbl_tab)
+            linhas = []
+            for b in bases_usadas:
+                r = b.get("resumo") or {}
+                linhas.append(
+                    {
+                        "Base CVM": b.get("nome") or b.get("arquivo_padrao") or "CVM",
+                        "Exercício": str(b.get("ano_referencia") or "n/d"),
+                        "Empresas": int(r.get("companhias_analisadas") or r.get("total_companhias") or 0),
+                        "Margem Líquida": _fmt_pct_cvm(r.get("margem_liquida_pct")),
+                        "Margem Bruta": _fmt_pct_cvm(r.get("margem_bruta_pct")),
+                        "Custo / Receita": _fmt_pct_cvm(r.get("custo_sobre_receita_pct")),
+                        "Var. Receita Anual": _fmt_pct_cvm(r.get("variacao_receita_pct")),
+                    }
+                )
+            df_cmp = pd.DataFrame(linhas)
+            self.lay_di.addWidget(
+                PaginatedTableWidget(df_cmp, linhas_por_pagina=max(5, len(df_cmp)), status_cols=())
+            )
+
+
+class CVMGerenciadorWidget(QWidget):
+    """Gerenciador completo de bases públicas CVM na página Dados Externos."""
+
+    def __init__(self, janela: "OneWorldWindow"):
+        super().__init__()
+        self.janela = janela
+        self._cards_busca: list[tuple[QFrame, str]] = []
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(12)
+
+        # Barra de ações e ativação
+        card_topo = QFrame()
+        card_topo.setObjectName("ToolbarCard")
+        lay_topo = QVBoxLayout(card_topo)
+        lay_topo.setContentsMargins(16, 12, 16, 12)
+        lay_topo.setSpacing(8)
+
+        lbl_tit = QLabel("Bases Públicas de Comparação (CVM) & Decision Intelligence")
+        lbl_tit.setObjectName("SectionTitle")
+        lay_topo.addWidget(lbl_tit)
+
+        lbl_desc = QLabel(
+            "As bases da CVM funcionam como referências de mercado separadas dos seus lançamentos operacionais. "
+            "Adicione uma ou mais bases, edite os nomes, atualize ou exclua arquivos e habilite a comparação no Dashboard/BI."
+        )
+        lbl_desc.setObjectName("Caption")
+        lbl_desc.setWordWrap(True)
+        lay_topo.addWidget(lbl_desc)
+
+        barra_btns = QHBoxLayout()
+        barra_btns.setSpacing(10)
+
+        self.btn_add_cvm = QPushButton("+ Adicionar Base(s) CVM...")
+        self.btn_add_cvm.setObjectName("PrimaryBtn")
+        self.btn_add_cvm.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_add_cvm.clicked.connect(self._ao_adicionar_arquivos)
+        barra_btns.addWidget(self.btn_add_cvm)
+
+        self.btn_add_pasta = QPushButton("+ Pasta CVM...")
+        self.btn_add_pasta.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_add_pasta.clicked.connect(self._ao_adicionar_pasta)
+        barra_btns.addWidget(self.btn_add_pasta)
+
+        self.chk_ativa = QCheckBox("Habilitar comparação no Dashboard / BI")
+        self.chk_ativa.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chk_ativa.toggled.connect(self._ao_alternar_ativa)
+        barra_btns.addWidget(self.chk_ativa)
+        barra_btns.addStretch(1)
+        lay_topo.addLayout(barra_btns)
+
+        barra_filtro = QHBoxLayout()
+        barra_filtro.setSpacing(8)
+        self.ed_filtro = QLineEdit()
+        self.ed_filtro.setPlaceholderText("Filtrar bases CVM cadastradas por nome, arquivo ou ano...")
+        self.ed_filtro.textChanged.connect(self._aplicar_filtro)
+        barra_filtro.addWidget(self.ed_filtro, stretch=1)
+
+        btn_todas = QPushButton("Selecionar todas")
+        btn_todas.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_todas.clicked.connect(self._selecionar_todas)
+        barra_filtro.addWidget(btn_todas)
+
+        btn_recente = QPushButton("Apenas mais recente")
+        btn_recente.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_recente.clicked.connect(self._selecionar_mais_recente)
+        barra_filtro.addWidget(btn_recente)
+
+        btn_nenhuma = QPushButton("Desmarcar todas")
+        btn_nenhuma.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_nenhuma.clicked.connect(self._desmarcar_todas)
+        barra_filtro.addWidget(btn_nenhuma)
+        lay_topo.addLayout(barra_filtro)
+
+        lay.addWidget(card_topo)
+
+        self.alerta_erro = AlertBox("", "error")
+        self.alerta_erro.setVisible(False)
+        lay.addWidget(self.alerta_erro)
+
+        self.alerta_sucesso = AlertBox("", "success")
+        self.alerta_sucesso.setVisible(False)
+        lay.addWidget(self.alerta_sucesso)
+
+        self.lay_lista = QVBoxLayout()
+        self.lay_lista.setSpacing(10)
+        lay.addLayout(self.lay_lista)
+
+        self.recarregar()
+
+    def _mostrar_erro(self, msg: str | None):
+        if msg:
+            self.alerta_sucesso.setVisible(False)
+            self.alerta_erro.definir_texto(msg)
+            self.alerta_erro.setVisible(True)
+        else:
+            self.alerta_erro.setVisible(False)
+
+    def _mostrar_sucesso(self, msg: str | None):
+        if msg:
+            self.alerta_erro.setVisible(False)
+            self.alerta_sucesso.definir_texto(msg)
+            self.alerta_sucesso.setVisible(True)
+        else:
+            self.alerta_sucesso.setVisible(False)
+
+    def _ao_alternar_ativa(self, checked: bool):
+        self._mostrar_sucesso(None)
+        cvm_cmp.definir_comparacao_ativa(bool(checked))
+        self.janela.aviso(
+            "Comparação CVM habilitada." if checked else "Comparação CVM desabilitada."
+        )
+        self.recarregar()
+
+    def _ao_adicionar_arquivos(self):
+        caminhos, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Selecionar base(s) pública(s) CVM",
+            "",
+            "Bases CVM (*.zip *.csv *.xlsx);;ZIP (*.zip);;CSV (*.csv);;Excel (*.xlsx)",
+        )
+        if not caminhos:
+            return
+        self.adicionar_caminhos(caminhos)
+
+    def _ao_adicionar_pasta(self):
+        pasta = QFileDialog.getExistingDirectory(self, "Selecionar pasta da base CVM", "")
+        if not pasta:
+            return
+        self.adicionar_caminhos([pasta])
+
+    def adicionar_caminhos(self, caminhos: list[str | Path]):
+        """Adiciona uma ou várias fontes CVM ao catálogo e atualiza a lista."""
+        self._mostrar_erro(None)
+        try:
+            adicionadas = cvm_cmp.adicionar_bases_cvm(caminhos)
+        except (OSError, ValueError, zipfile.BadZipFile) as exc:
+            self._mostrar_erro(f"Não foi possível adicionar a base CVM: {exc}")
+            return
+        if adicionadas:
+            self.janela.aviso(f"{len(adicionadas)} base(s) CVM carregada(s) no catálogo.")
+            self._mostrar_sucesso(f"{len(adicionadas)} base(s) CVM salva(s) com sucesso.")
+            self.recarregar()
+
+    def _ao_salvar_nome(self, base_id: str, novo_nome: str):
+        self._mostrar_erro(None)
+        try:
+            cvm_cmp.renomear_base_cvm(base_id, novo_nome)
+        except (KeyError, ValueError) as exc:
+            self._mostrar_erro(str(exc))
+            return
+        self._mostrar_sucesso("Nome da base CVM atualizado.")
+        self.recarregar()
+
+    def _ao_atualizar_arquivo(self, base_id: str):
+        caminho, _ = QFileDialog.getOpenFileName(
+            self,
+            "Substituir arquivo da base CVM",
+            "",
+            "Bases CVM (*.zip *.csv *.xlsx);;ZIP (*.zip);;CSV (*.csv);;Excel (*.xlsx)",
+        )
+        if not caminho:
+            return
+        self.atualizar_arquivo(base_id, caminho)
+
+    def atualizar_arquivo(self, base_id: str, caminho: str | Path):
+        """Substitui o arquivo vinculado a uma base CVM existente."""
+        self._mostrar_erro(None)
+        try:
+            cvm_cmp.atualizar_arquivo_cvm(base_id, caminho)
+        except (KeyError, OSError, ValueError, zipfile.BadZipFile) as exc:
+            self._mostrar_erro(f"Não foi possível atualizar a base CVM: {exc}")
+            return
+        self.janela.aviso("Base CVM atualizada com novo arquivo.")
+        self._mostrar_sucesso("Arquivo da base CVM atualizado com sucesso.")
+        self.recarregar()
+
+    def _ao_excluir(self, base_id: str, nome: str):
+        self._mostrar_erro(None)
+        cvm_cmp.excluir_base_cvm(base_id)
+        self.janela.aviso(f"Base CVM removida: {nome}")
+        self._mostrar_sucesso(f"Base '{nome}' excluída do catálogo.")
+        self.recarregar()
+
+    def _ao_alternar_selecao(self, base_id: str, marcado: bool):
+        estado = cvm_cmp.carregar_estado_cvm()
+        sel = list(estado.get("selecionadas") or [])
+        if marcado and base_id not in sel:
+            sel.append(base_id)
+        elif not marcado and base_id in sel:
+            sel.remove(base_id)
+        cvm_cmp.definir_bases_selecionadas(sel)
+
+    def _selecionar_todas(self):
+        estado = cvm_cmp.carregar_estado_cvm()
+        cvm_cmp.definir_bases_selecionadas([b["id"] for b in estado.get("bases", [])])
+        self.recarregar()
+
+    def _selecionar_mais_recente(self):
+        estado = cvm_cmp.carregar_estado_cvm()
+        ord_bases = cvm_cmp.ordenar_bases_recentes(estado.get("bases", []))
+        cvm_cmp.definir_bases_selecionadas([ord_bases[0]["id"]] if ord_bases else [])
+        self.recarregar()
+
+    def _desmarcar_todas(self):
+        cvm_cmp.definir_bases_selecionadas([])
+        self.recarregar()
+
+    def _aplicar_filtro(self):
+        termo = bk.sem_acento(self.ed_filtro.text())
+        for card, chave_busca in self._cards_busca:
+            card.setVisible(not termo or termo in chave_busca)
+
+    def recarregar(self):
+        """Reconstrói a listagem de bases CVM mantendo o estado persistido."""
+        estado = cvm_cmp.carregar_estado_cvm()
+        self.chk_ativa.blockSignals(True)
+        self.chk_ativa.setChecked(bool(estado.get("ativa")))
+        self.chk_ativa.blockSignals(False)
+
+        _limpar_layout_widgets(self.lay_lista)
+        self._cards_busca.clear()
+
+        bases_ord = cvm_cmp.ordenar_bases_recentes(estado.get("bases", []))
+        sel = set(estado.get("selecionadas") or [])
+        cor = self.janela.cfg.get("cor", ROXO)
+
+        if not bases_ord:
+            self.lay_lista.addWidget(
+                AlertBox(
+                    "Nenhuma base CVM cadastrada. Clique em '+ Adicionar Base(s) CVM...' para incluir arquivos.",
+                    "info",
+                )
+            )
+            return
+
+        for idx, base in enumerate(bases_ord):
+            res = base.get("resumo") or {}
+            bid = base["id"]
+            card = QFrame()
+            card.setObjectName("OwCard")
+            lay_c = QVBoxLayout(card)
+            lay_c.setContentsMargins(14, 12, 14, 12)
+            lay_c.setSpacing(8)
+
+            # Linha 1: seleção para comparação + campo de nome editável + ações
+            l1 = QHBoxLayout()
+            l1.setSpacing(8)
+            chk_sel = QCheckBox("Usar na comparação")
+            chk_sel.setCursor(Qt.CursorShape.PointingHandCursor)
+            chk_sel.setChecked(bid in sel)
+            chk_sel.toggled.connect(lambda m, b_id=bid: self._ao_alternar_selecao(b_id, m))
+            l1.addWidget(chk_sel)
+
+            if idx == 0:
+                badge = QLabel("Mais recente · Prioridade")
+                badge.setStyleSheet(
+                    f"background:{cor}; color:#FFFFFF; padding: 3px 10px; "
+                    "border-radius: 10px; font-weight: 600;"
+                )
+                l1.addWidget(badge)
+
+            ed_nome = QLineEdit(str(base.get("nome") or ""))
+            ed_nome.setPlaceholderText(str(base.get("nome_padrao") or base.get("arquivo_padrao") or ""))
+            ed_nome.returnPressed.connect(lambda b_id=bid, ed=ed_nome: self._ao_salvar_nome(b_id, ed.text()))
+            l1.addWidget(ed_nome, stretch=1)
+
+            btn_salvar = QPushButton("Salvar nome")
+            btn_salvar.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_salvar.clicked.connect(lambda _, b_id=bid, ed=ed_nome: self._ao_salvar_nome(b_id, ed.text()))
+            l1.addWidget(btn_salvar)
+
+            btn_atualizar = QPushButton("Atualizar arquivo...")
+            btn_atualizar.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_atualizar.clicked.connect(lambda _, b_id=bid: self._ao_atualizar_arquivo(b_id))
+            l1.addWidget(btn_atualizar)
+
+            btn_excluir = QPushButton("Excluir")
+            btn_excluir.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn_excluir.clicked.connect(
+                lambda _, b_id=bid, nm=base.get("nome", "CVM"): self._ao_excluir(b_id, nm)
+            )
+            l1.addWidget(btn_excluir)
+            lay_c.addLayout(l1)
+
+            # Linha 2: metadados e indicadores extraídos
+            ano = base.get("ano_referencia") or res.get("ano_referencia") or "n/d"
+            dt_ref = base.get("data_referencia") or res.get("data_referencia") or "n/d"
+            cias_an = int(res.get("companhias_analisadas") or 0)
+            cias_tot = int(res.get("total_companhias") or 0)
+            info1 = QLabel(
+                f"Arquivo: {base.get('arquivo_padrao', 'n/d')}  ·  "
+                f"Exercício: {ano} (Ref.: {dt_ref})  ·  "
+                f"Companhias analisadas: {cias_an}/{cias_tot}  ·  "
+                f"Atualizado em: {base.get('atualizado_em', 'n/d')}"
+            )
+            info1.setObjectName("Caption")
+            info1.setWordWrap(True)
+            lay_c.addWidget(info1)
+
+            info2 = QLabel(
+                f"Indicadores medianos (DRE):  "
+                f"Margem Líquida {_fmt_pct_cvm(res.get('margem_liquida_pct'))}  ·  "
+                f"Margem Bruta {_fmt_pct_cvm(res.get('margem_bruta_pct'))}  ·  "
+                f"Custo/Receita {_fmt_pct_cvm(res.get('custo_sobre_receita_pct'))}  ·  "
+                f"Var. Receita Anual {_fmt_pct_cvm(res.get('variacao_receita_pct'))}"
+            )
+            info2.setObjectName("Caption")
+            info2.setWordWrap(True)
+            lay_c.addWidget(info2)
+
+            self.lay_lista.addWidget(card)
+            chave_busca = bk.sem_acento(
+                f"{base.get('nome', '')} {base.get('arquivo_padrao', '')} {ano}"
+            )
+            self._cards_busca.append((card, chave_busca))
+
+        self._aplicar_filtro()
 
 
 # ── Widget de Importação de Planilhas ──
@@ -783,12 +1325,13 @@ class OneWorldWindow(QMainWindow):
         logo = bk.logo_atual()
         if logo and logo.exists():
             lbl_logo = QLabel()
-            pix = pixmap_arredondado(logo, 210, raio=14)
+            pix = pixmap_arredondado(logo, 136, raio=12)
             if not pix.isNull():
                 lbl_logo.setPixmap(pix)
                 self.lay_sidebar.addWidget(lbl_logo, alignment=Qt.AlignmentFlag.AlignCenter)
             if bk.sem_acento(self.cfg["nome"]) != "oneworld":
                 lbl_nm = QLabel(f"<b>{self.cfg['nome']}</b>")
+                lbl_nm.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.lay_sidebar.addWidget(lbl_nm)
         else:
             lbl_nm = QLabel(self.cfg["nome"])
@@ -797,11 +1340,12 @@ class OneWorldWindow(QMainWindow):
 
         cap_sub = QLabel("Gerência e análise em um só mundo")
         cap_sub.setObjectName("Caption")
+        cap_sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
         cap_sub.setWordWrap(True)
         self.lay_sidebar.addWidget(cap_sub)
-        self.lay_sidebar.addSpacing(8)
+        self.lay_sidebar.addSpacing(10)
 
-        lbl_nav = QLabel("Navegação")
+        lbl_nav = QLabel("NAVEGAÇÃO")
         lbl_nav.setObjectName("Caption")
         self.lay_sidebar.addWidget(lbl_nav)
 
@@ -817,21 +1361,29 @@ class OneWorldWindow(QMainWindow):
             self.lay_sidebar.addWidget(btn)
 
         self.lay_sidebar.addStretch(1)
-        self.lay_sidebar.addWidget(Divider())
 
-        lbl_amb = QLabel("Ambiente")
-        lbl_amb.setObjectName("Caption")
-        self.lay_sidebar.addWidget(lbl_amb)
+        card_amb = QFrame()
+        card_amb.setObjectName("SidebarEnvCard")
+        lay_amb = QVBoxLayout(card_amb)
+        lay_amb.setContentsMargins(12, 10, 12, 10)
+        lay_amb.setSpacing(3)
+        lbl_amb = QLabel("AMBIENTE")
+        lbl_amb.setObjectName("MetricLabel")
+        lay_amb.addWidget(lbl_amb)
         perfil_txt = self.cfg.get("perfil_negocio", PERFIL_PADRAO)
-        for info in (f"Perfil: {perfil_txt}", "Modo: local", "Banco: SQLite", "Status: operacional"):
+        for info in (f"Perfil: {perfil_txt}", "Banco: SQLite local + Base CVM", "Status: Operacional"):
             lbl_i = QLabel(info)
+            lbl_i.setObjectName("Caption")
             lbl_i.setWordWrap(True)
-            self.lay_sidebar.addWidget(lbl_i)
+            lay_amb.addWidget(lbl_i)
+        self.lay_sidebar.addWidget(card_amb)
 
         self.sidebar_frame.style().unpolish(self.sidebar_frame)
         self.sidebar_frame.style().polish(self.sidebar_frame)
 
     def navegar_para(self, nova_pagina: str):
+        if nova_pagina not in PAGINAS:
+            nova_pagina = "Dashboard"
         if nova_pagina != self.pagina_atual and not self.cfg.get("lembrar_filtros", True):
             for k in FILTROS:
                 self.estado.pop(k, None)
@@ -882,9 +1434,10 @@ class OneWorldWindow(QMainWindow):
             "Convidados & Planilhas": self.pagina_convidados,
             "Dados Externos": self.pagina_dados_externos,
             "Orientação IA": self.pagina_ia,
-            "Anotações": self.pagina_anotacoes,
             "Configurações": self.pagina_config,
         }
+        if self.pagina_atual not in rotas:
+            self.pagina_atual = "Dashboard"
         rotas[self.pagina_atual]()
 
         self.lay_pagina.addStretch(1)
@@ -896,32 +1449,40 @@ class OneWorldWindow(QMainWindow):
     # ── PÁGINA 1: DASHBOARD ──
     def pagina_dashboard(self):
         v = self.vocab()
-        self._cabecalho("Dashboard", "Análise configurável de conjuntos de dados e indicadores do negócio")
+        self._cabecalho("Dashboard", "Visão consolidada do negócio e explorador analítico de dados (BI)")
 
         abas = QTabWidget()
 
-        # Aba 1: Dashboard BI Genérico
-        w_bi = QWidget()
-        lay_bi = QVBoxLayout(w_bi)
-        lay_bi.setContentsMargins(12, 12, 12, 12)
-        lay_bi.setSpacing(12)
-        from .frontend_bi import BIDashboardWidget
-
-        self.bi_widget = BIDashboardWidget(self.cfg, parent=self)
-        lay_bi.addWidget(self.bi_widget)
-        abas.addTab(w_bi, "📈 Dashboard BI Genérico")
-
-        # Aba 2: Visão Geral (Negócio)
+        # Aba 1 (Padrão): Visão Geral (Negócio)
         w_negocio = QWidget()
         lay_neg = QVBoxLayout(w_negocio)
-        lay_neg.setContentsMargins(12, 12, 12, 12)
-        lay_neg.setSpacing(12)
+        lay_neg.setContentsMargins(16, 16, 16, 16)
+        lay_neg.setSpacing(16)
         self._montar_dashboard_negocio(lay_neg)
         abas.addTab(w_negocio, "🏢 Visão Geral (Negócio)")
 
+        # Aba 2: Dashboard BI Genérico (inicia limpo, sem CSVs estáticos de exemplo)
+        w_bi = QWidget()
+        lay_bi = QVBoxLayout(w_bi)
+        lay_bi.setContentsMargins(16, 16, 16, 16)
+        lay_bi.setSpacing(14)
+        from .frontend_bi import BIDashboardWidget
+
+        self.bi_widget = BIDashboardWidget(self.cfg, parent=self, carregar_exemplos=False)
+        lay_bi.addWidget(self.bi_widget)
+        abas.addTab(w_bi, "📈 Explorador BI (Tabelas & Arquivos)")
+
         aba_idx = self.estado.get("dash_aba_ativa", 0)
         abas.setCurrentIndex(aba_idx)
-        abas.currentChanged.connect(lambda idx: self.estado.__setitem__("dash_aba_ativa", idx))
+
+        def ao_mudar_aba(idx: int):
+            self.estado["dash_aba_ativa"] = idx
+            if idx == 0 and hasattr(self, "cvm_painel_negocio"):
+                self.cvm_painel_negocio.atualizar()
+            elif idx == 1 and hasattr(self, "bi_widget"):
+                self.bi_widget.atualizar_comparacao_cvm()
+
+        abas.currentChanged.connect(ao_mudar_aba)
 
         self.lay_pagina.addWidget(abas)
 
@@ -929,12 +1490,20 @@ class OneWorldWindow(QMainWindow):
         v = self.vocab()
         e, cv = self.dados("eventos"), self.dados("convidados")
 
-        barra_f = QHBoxLayout()
-        barra_f.setSpacing(16)
+        # ── 1. Barra Superior: Filtros + Ações Rápidas ──
+        card_topo = QFrame()
+        card_topo.setObjectName("ToolbarCard")
+        lay_topo = QHBoxLayout(card_topo)
+        lay_topo.setContentsMargins(16, 12, 16, 12)
+        lay_topo.setSpacing(18)
 
         col_f1 = QVBoxLayout()
-        col_f1.addWidget(QLabel("Período"))
+        col_f1.setSpacing(4)
+        lbl_per = QLabel("Período")
+        lbl_per.setObjectName("MetricLabel")
+        col_f1.addWidget(lbl_per)
         cb_mes = QComboBox()
+        cb_mes.setMinimumWidth(150)
         meses = ["Todos"] + bk.meses_disponiveis(e)
         for m in meses:
             rot = m if m == "Todos" else f"{m[5:]}/{m[:4]}"
@@ -947,56 +1516,175 @@ class OneWorldWindow(QMainWindow):
             lambda _: self._definir_filtro("dash_mes", cb_mes.currentData())
         )
         col_f1.addWidget(cb_mes)
-        barra_f.addLayout(col_f1, stretch=1)
+        lay_topo.addLayout(col_f1)
 
         col_f2 = QVBoxLayout()
-        col_f2.addWidget(QLabel(v["rotulos"]["status"]))
+        col_f2.setSpacing(4)
+        lbl_st = QLabel(v["rotulos"]["status"])
+        lbl_st.setObjectName("MetricLabel")
+        col_f2.addWidget(lbl_st)
         stat_atual = self.estado.get("dash_status", [])
         ms_status = MultiSelectChips(STATUS_EVENTO, stat_atual, self.cfg["cor"])
         ms_status.changed.connect(lambda vals: self._definir_filtro("dash_status", vals))
         col_f2.addWidget(ms_status)
-        barra_f.addLayout(col_f2, stretch=2)
+        lay_topo.addLayout(col_f2, stretch=1)
 
-        container_lay.addLayout(barra_f)
+        col_acoes = QVBoxLayout()
+        col_acoes.setSpacing(4)
+        lbl_ac = QLabel("Ações rápidas")
+        lbl_ac.setObjectName("MetricLabel")
+        col_acoes.addWidget(lbl_ac)
+        linha_ac = QHBoxLayout()
+        linha_ac.setSpacing(8)
 
+        btn_nova_op = QPushButton(f"+ {v['ent1_singular']}")
+        btn_nova_op.setObjectName("PrimaryBtn")
+        btn_nova_op.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_nova_op.clicked.connect(lambda: self._abrir_modulo_financeiro(0))
+        linha_ac.addWidget(btn_nova_op)
+
+        btn_novo_gasto = QPushButton(f"+ {v['ent2_singular']}")
+        btn_novo_gasto.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_novo_gasto.clicked.connect(lambda: self._abrir_modulo_financeiro(1))
+        linha_ac.addWidget(btn_novo_gasto)
+
+        btn_imp = QPushButton("Importar Planilha")
+        btn_imp.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_imp.clicked.connect(lambda: self.navegar_para("Dados Externos"))
+        linha_ac.addWidget(btn_imp)
+
+        btn_ia = QPushButton("Orientação IA (CVM)")
+        btn_ia.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_ia.clicked.connect(lambda: self.navegar_para("Orientação IA"))
+        linha_ac.addWidget(btn_ia)
+
+        col_acoes.addLayout(linha_ac)
+        lay_topo.addLayout(col_acoes)
+
+        container_lay.addWidget(card_topo)
+
+        # ── 2. Faixa de Indicadores (KPIs Financeiros) ──
         f = bk.filtrar_eventos(e, mes_atual, stat_atual)
-        conf = int((cv["confirmacao"] == "Confirmado").sum()) if not cv.empty else 0
+        fin = bk.resumo_financeiro(f, cv)
+        pend_rec = int(f["status"].isin(["Pendente", "Em planejamento"]).sum()) if not f.empty else 0
 
         linha_m = QHBoxLayout()
         linha_m.setSpacing(12)
-        linha_m.addWidget(MetricCard(v["metric_ent1"], len(f)))
-        linha_m.addWidget(MetricCard(v["metric_qtd"], int(f["convidados"].sum())))
-        linha_m.addWidget(MetricCard(v["metric_valor"], self.moeda(f["valor"].sum())))
-        linha_m.addWidget(MetricCard(v["metric_pend"], int(f["status"].isin(["Pendente", "Em planejamento"]).sum())))
-        linha_m.addWidget(MetricCard(v["metric_ent2_conf"], f"{conf} de {len(cv)}"))
+        for rot, val in (
+            (v["metric_valor"], self.moeda(fin["receita_bruta"])),
+            ("Total de Gastos", self.moeda(fin["gasto_total"])),
+            ("Rendimento Líquido", self.moeda(fin["rendimento_liquido"])),
+            ("Margem / Rendimento", f"{fin['margem_pct']:.1f}%"),
+            (v["metric_pend"], pend_rec),
+        ):
+            mc = MetricCard(rot, val)
+            mc.setMinimumHeight(84)
+            linha_m.addWidget(mc)
         container_lay.addLayout(linha_m)
 
         cap = QLabel(v["legenda_valor"])
         cap.setObjectName("Caption")
         container_lay.addWidget(cap)
-        container_lay.addWidget(Divider())
 
+        # ── 2b. Comparação CVM & Decision Intelligence ──
+        self.cvm_painel_negocio = CVMComparacaoPainel(
+            self.cfg,
+            lambda resumo=fin: resumo,
+            parent=self,
+        )
+        container_lay.addWidget(self.cvm_painel_negocio)
+
+        # ── 3. Estado Vazio Limpo (quando o banco local está sem registros) ──
+        if e.empty and cv.empty:
+            card_vazio = QFrame()
+            card_vazio.setObjectName("EmptyStateCard")
+            lay_vazio = QVBoxLayout(card_vazio)
+            lay_vazio.setContentsMargins(28, 28, 28, 28)
+            lay_vazio.setSpacing(10)
+
+            lbl_vt = QLabel("Base financeira limpa e pronta para uso")
+            lbl_vt.setObjectName("EmptyTitle")
+            lbl_vt.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lay_vazio.addWidget(lbl_vt)
+
+            lbl_vd = QLabel(
+                f"Nenhum registro de {v['ent1_plural'].lower()} ou {v['ent2_plural'].lower()} foi inserido ainda.\n"
+                "A base pública DFP da CVM já está disponível para consulta comparativa em 'Orientação IA'."
+            )
+            lbl_vd.setObjectName("Caption")
+            lbl_vd.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lbl_vd.setWordWrap(True)
+            lay_vazio.addWidget(lbl_vd)
+
+            linha_bv = QHBoxLayout()
+            linha_bv.addStretch(1)
+
+            b1 = QPushButton(f"Cadastrar {v['ent1_singular'].lower()}")
+            b1.setObjectName("PrimaryBtn")
+            b1.setCursor(Qt.CursorShape.PointingHandCursor)
+            b1.clicked.connect(lambda: self._abrir_modulo_financeiro(0))
+            linha_bv.addWidget(b1)
+
+            b_gasto = QPushButton(f"Lançar {v['ent2_singular'].lower()}")
+            b_gasto.setCursor(Qt.CursorShape.PointingHandCursor)
+            b_gasto.clicked.connect(lambda: self._abrir_modulo_financeiro(1))
+            linha_bv.addWidget(b_gasto)
+
+            b2 = QPushButton("Importar planilha externa")
+            b2.setCursor(Qt.CursorShape.PointingHandCursor)
+            b2.clicked.connect(lambda: self.navegar_para("Dados Externos"))
+            linha_bv.addWidget(b2)
+
+            b3 = QPushButton("Consultar CVM / Orientação IA")
+            b3.setCursor(Qt.CursorShape.PointingHandCursor)
+            b3.clicked.connect(lambda: self.navegar_para("Orientação IA"))
+            linha_bv.addWidget(b3)
+
+            linha_bv.addStretch(1)
+            lay_vazio.addSpacing(6)
+            lay_vazio.addLayout(linha_bv)
+            container_lay.addWidget(card_vazio)
+            container_lay.addStretch(1)
+            return
+
+        # ── 4. Gráficos e Painel de Notificações (quando há dados) ──
         linha_g = QHBoxLayout()
         linha_g.setSpacing(16)
 
-        col_g1 = QVBoxLayout()
-        col_g2 = QVBoxLayout()
-        col_g3 = QVBoxLayout()
+        card_g1 = QFrame()
+        card_g1.setObjectName("OwCard")
+        col_g1 = QVBoxLayout(card_g1)
+        col_g1.setContentsMargins(16, 14, 16, 14)
+
+        card_g2 = QFrame()
+        card_g2.setObjectName("OwCard")
+        col_g2 = QVBoxLayout(card_g2)
+        col_g2.setContentsMargins(16, 14, 16, 14)
+
+        card_g3 = QFrame()
+        card_g3.setObjectName("OwCard")
+        col_g3 = QVBoxLayout(card_g3)
+        col_g3.setContentsMargins(16, 14, 16, 14)
 
         if not f.empty:
             t = f.assign(mes=pd.to_datetime(f["data"]).dt.strftime("%Y-%m"))
             col_g1.addWidget(self._subtitulo(f"{v['metric_valor']} por mês"))
             col_g1.addWidget(BarChartWidget(t.groupby("mes")["valor"].sum(), self.cfg["cor"], self.cfg, True))
+        else:
+            col_g1.addWidget(self._subtitulo(f"{v['metric_valor']} por mês"))
+            col_g1.addWidget(AlertBox("Nenhum registro de receita corresponde aos filtros selecionados.", "info"))
 
+        if not fin["gastos_por_categoria"].empty:
+            col_g2.addWidget(self._subtitulo("Gastos por categoria (R$)"))
+            col_g2.addWidget(BarChartWidget(fin["gastos_por_categoria"], self.cfg["cor2"], self.cfg, True))
+        elif not f.empty:
             col_g2.addWidget(self._subtitulo(v["grafico_status"]))
             col_g2.addWidget(BarChartWidget(f.groupby("status").size(), self.cfg["cor2"], self.cfg, False))
         else:
-            col_g1.addWidget(self._subtitulo(f"{v['metric_valor']} por mês"))
-            col_g1.addWidget(AlertBox("Nenhum dado registrado para exibir no gráfico.", "info"))
-            col_g2.addWidget(self._subtitulo(v["grafico_status"]))
-            col_g2.addWidget(AlertBox("Nenhum dado registrado para exibir no gráfico.", "info"))
+            col_g2.addWidget(self._subtitulo("Gastos por categoria (R$)"))
+            col_g2.addWidget(AlertBox("Nenhum gasto registrado para exibir no gráfico.", "info"))
 
-        col_g3.addWidget(self._subtitulo("Notificações"))
+        col_g3.addWidget(self._subtitulo("Notificações & Alertas"))
         tem_notif = False
         if self.cfg.get("lembretes", True):
             for msg in bk.lembretes(e):
@@ -1011,15 +1699,20 @@ class OneWorldWindow(QMainWindow):
             col_g3.addWidget(lbl_sem)
         col_g3.addStretch(1)
 
-        linha_g.addLayout(col_g1, stretch=20)
-        linha_g.addLayout(col_g2, stretch=20)
-        linha_g.addLayout(col_g3, stretch=13)
+        linha_g.addWidget(card_g1, stretch=20)
+        linha_g.addWidget(card_g2, stretch=20)
+        linha_g.addWidget(card_g3, stretch=14)
         container_lay.addLayout(linha_g)
 
-        container_lay.addWidget(self._subtitulo(v["proximos_titulo"]))
+        # ── 5. Tabela de Próximas Operações ──
+        card_tab = QFrame()
+        card_tab.setObjectName("OwCard")
+        lay_tab = QVBoxLayout(card_tab)
+        lay_tab.setContentsMargins(16, 14, 16, 14)
+        lay_tab.addWidget(self._subtitulo(v["proximos_titulo"]))
         prox = f[pd.to_datetime(f["data"]).dt.date >= date.today()] if not f.empty else f
         df_exibir = (prox if not prox.empty else f).drop(columns=["id"], errors="ignore")
-        container_lay.addWidget(
+        lay_tab.addWidget(
             PaginatedTableWidget(
                 self.formatar(df_exibir, "eventos"),
                 linhas_por_pagina=self.cfg["linhas"],
@@ -1027,15 +1720,48 @@ class OneWorldWindow(QMainWindow):
                 ao_mudar_pagina=lambda pg: self.estado.__setitem__("pg_dash", pg),
             )
         )
+        container_lay.addWidget(card_tab)
 
     def _definir_filtro(self, chave: str, valor):
         self.estado[chave] = valor
         self.reconstruir_pagina()
 
-    # ── PÁGINA 2: ENTIDADE PRINCIPAL (OPERAÇÕES / VENDAS / PROJETOS / EVENTOS) ──
+    def _abrir_modulo_financeiro(self, aba_idx: int):
+        self.estado["tab_modulo_fin"] = aba_idx
+        self.navegar_para("Eventos")
+
+    # ── PÁGINA 2: MÓDULO UNIFICADO (RECEITAS/OPERAÇÕES + GASTOS/DESPESAS) ──
     def pagina_eventos(self):
         v = self.vocab()
         self._cabecalho(v["menu_ent1"], v["ent1_subtitulo"])
+
+        e = self.dados("eventos")
+
+        abas_mod = QTabWidget()
+
+        w_ev = QWidget()
+        lay_ev = QVBoxLayout(w_ev)
+        lay_ev.setContentsMargins(12, 12, 12, 12)
+        lay_ev.setSpacing(10)
+        self._montar_aba_eventos(lay_ev, e)
+        abas_mod.addTab(w_ev, f"💰 {v['ent1_plural']} (Entradas)")
+
+        w_cv = QWidget()
+        lay_cv = QVBoxLayout(w_cv)
+        lay_cv.setContentsMargins(12, 12, 12, 12)
+        lay_cv.setSpacing(10)
+        self._montar_aba_convidados(lay_cv)
+        abas_mod.addTab(w_cv, f"📉 {v['ent2_plural']} (Saídas & Custos)")
+
+        idx_mod = self.estado.get("tab_modulo_fin", 0)
+        if idx_mod not in (0, 1):
+            idx_mod = 0
+        abas_mod.setCurrentIndex(idx_mod)
+        abas_mod.currentChanged.connect(lambda idx: self.estado.__setitem__("tab_modulo_fin", idx))
+        self.lay_pagina.addWidget(abas_mod)
+
+    def _montar_aba_eventos(self, container_lay: QVBoxLayout, e: pd.DataFrame):
+        v = self.vocab()
         abas = QTabWidget()
 
         # Aba 1: Listagem
@@ -1044,7 +1770,6 @@ class OneWorldWindow(QMainWindow):
         l_lista.setContentsMargins(16, 16, 16, 16)
         l_lista.setSpacing(12)
 
-        e = self.dados("eventos")
         barra_f = QHBoxLayout()
         barra_f.setSpacing(16)
 
@@ -1213,7 +1938,7 @@ class OneWorldWindow(QMainWindow):
         abas.addTab(w_ed, "Editar / excluir")
         abas.setCurrentIndex(self.estado.get("tab_eventos", 0))
         abas.currentChanged.connect(lambda idx: self.estado.__setitem__("tab_eventos", idx))
-        self.lay_pagina.addWidget(abas)
+        container_lay.addWidget(abas)
 
     def _montar_form_evento(self, v_row: dict | None):
         v_row = {} if v_row is None else v_row
@@ -1298,11 +2023,14 @@ class OneWorldWindow(QMainWindow):
         lay.addWidget(btn, alignment=Qt.AlignmentFlag.AlignLeft)
         return w
 
-    # ── PÁGINA 3: ENTIDADE SECUNDÁRIA (CADASTROS / CLIENTES / ATIVIDADES / CONVIDADOS) ──
+    # ── ABA SECUNDÁRIA UNIFICADA (GASTOS / DESPESAS / CADASTROS) ──
     def pagina_convidados(self):
+        self.estado["tab_modulo_fin"] = 1
+        self.pagina_eventos()
+
+    def _montar_aba_convidados(self, container_lay: QVBoxLayout):
         v = self.vocab()
         rot = v["rotulos"]
-        self._cabecalho(v["menu_ent2"], v["ent2_subtitulo"])
         abas = QTabWidget()
 
         # Aba 1: Listagem
@@ -1338,12 +2066,12 @@ class OneWorldWindow(QMainWindow):
 
         linha_m = QHBoxLayout()
         linha_m.setSpacing(12)
-        card_conf = MetricCard("Confirmados", 0)
-        card_pend = MetricCard("Pendentes", 0)
-        card_rec = MetricCard("Recusaram / Inativos", 0)
+        card_total_gasto = MetricCard("Total de Gastos Filtrados", self.moeda(0))
+        card_conf = MetricCard("Quitados / Confirmados", 0)
+        card_pend = MetricCard("A pagar / Pendentes", 0)
+        linha_m.addWidget(card_total_gasto)
         linha_m.addWidget(card_conf)
         linha_m.addWidget(card_pend)
-        linha_m.addWidget(card_rec)
         l_lista.addLayout(linha_m)
 
         container_tab = QWidget()
@@ -1375,9 +2103,14 @@ class OneWorldWindow(QMainWindow):
             if conf:
                 df_f = df_f[df_f["confirmacao"].isin(conf)]
 
+            total_g = (
+                df_f[df_f["confirmacao"] != "Recusou"]["acompanhantes"].sum()
+                if not df_f.empty
+                else 0
+            )
+            card_total_gasto.atualizar(self.moeda(total_g))
             card_conf.atualizar(int((df_f["confirmacao"] == "Confirmado").sum()) if not df_f.empty else 0)
             card_pend.atualizar(int((df_f["confirmacao"] == "Pendente").sum()) if not df_f.empty else 0)
-            card_rec.atualizar(int((df_f["confirmacao"] == "Recusou").sum()) if not df_f.empty else 0)
 
             lay_tab.addWidget(
                 PaginatedTableWidget(
@@ -1508,7 +2241,7 @@ class OneWorldWindow(QMainWindow):
         abas.setCurrentIndex(self.estado.get("tab_convidados", 0))
         abas.currentChanged.connect(lambda idx: self.estado.__setitem__("tab_convidados", idx))
 
-        self.lay_pagina.addWidget(abas)
+        container_lay.addWidget(abas)
 
     def _montar_form_convidado(self, v_row: dict | None):
         v_row = {} if v_row is None else v_row
@@ -1532,7 +2265,8 @@ class OneWorldWindow(QMainWindow):
         ed_nm = QLineEdit(str(v_row.get("nome", "")))
         ed_ms = QLineEdit(bk.texto(v_row.get("mesa", "")))
         sp_ac = QSpinBox()
-        sp_ac.setRange(0, 1000)
+        sp_ac.setRange(0, 1_000_000_000)
+        sp_ac.setSingleStep(50)
         sp_ac.setValue(int(v_row.get("acompanhantes", 0) or 0))
         ed_ct = QLineEdit(str(v_row.get("contato", "")))
         restr_val = "" if v_row.get("restricao", "—") == "—" else str(v_row.get("restricao", ""))
@@ -1576,7 +2310,14 @@ class OneWorldWindow(QMainWindow):
 
     # ── PÁGINA 4: DADOS EXTERNOS ──
     def pagina_dados_externos(self):
-        self._cabecalho("Dados Externos", "Recebimento, validação e tratamento")
+        self._cabecalho(
+            "Dados Externos",
+            "Gerenciamento de bases públicas de comparação (CVM) e importação de planilhas",
+        )
+        self.cvm_gerenciador = CVMGerenciadorWidget(self)
+        self.lay_pagina.addWidget(self.cvm_gerenciador)
+        self.lay_pagina.addWidget(Divider())
+        self.lay_pagina.addWidget(self._subtitulo("Importação de planilhas para lançamentos do negócio"))
         self.lay_pagina.addWidget(ImportarPlanilhaWidget(self, destino_fixo=None, chave_estado="impex"))
         self.lay_pagina.addWidget(Divider())
         self.lay_pagina.addWidget(self._subtitulo("Histórico"))
@@ -1671,7 +2412,15 @@ class OneWorldWindow(QMainWindow):
         cap_ex.setWordWrap(True)
         lay.addWidget(cap_ex)
 
-        md = bk.gerar_markdown(self.dados("eventos"), self.dados("convidados"), self.cfg)
+        e_df, cv_df = self.dados("eventos"), self.dados("convidados")
+        estado_cvm = cvm_cmp.carregar_estado_cvm()
+        bloco_cvm = ""
+        if estado_cvm.get("ativa"):
+            di = cvm_cmp.avaliar_decision_intelligence(
+                bk.resumo_financeiro(e_df, cv_df), estado_cvm, self.cfg
+            )
+            bloco_cvm = di.get("markdown", "")
+        md = bk.gerar_markdown(e_df, cv_df, self.cfg, bloco_cvm=bloco_cvm)
         btn_md = QPushButton("Baixar Markdown")
         btn_md.setCursor(Qt.CursorShape.PointingHandCursor)
 
@@ -1698,76 +2447,7 @@ class OneWorldWindow(QMainWindow):
         exp_prev.corpo_layout.addWidget(ed_code)
         lay.addWidget(exp_prev)
 
-    # ── PÁGINA 6: ANOTAÇÕES ──
-    def pagina_anotacoes(self):
-        self._cabecalho("Anotações", "Notas, relatórios e datas previstas")
-
-        card_form = QFrame()
-        card_form.setObjectName("OwCard")
-        lay_f = QVBoxLayout(card_form)
-        lay_f.setContentsMargins(16, 16, 16, 16)
-        lay_f.setSpacing(10)
-
-        form = QFormLayout()
-        ed_tit = QLineEdit()
-        ed_desc = QPlainTextEdit()
-        ed_desc.setMaximumHeight(90)
-        hoje = date.today()
-        ed_dp = QDateEdit(QDate(hoje.year, hoje.month, hoje.day))
-        ed_dp.setCalendarPopup(True)
-        ed_dp.setDisplayFormat("dd/MM/yyyy")
-
-        form.addRow("Título", ed_tit)
-        form.addRow("Descrição", ed_desc)
-        form.addRow("Data prevista", ed_dp)
-        lay_f.addLayout(form)
-
-        lbl_err = QLabel()
-        lbl_err.setStyleSheet("color: #8F2412; font-weight: 600;")
-        lbl_err.setVisible(False)
-        lay_f.addWidget(lbl_err)
-
-        btn_salvar = QPushButton("Salvar anotação")
-        btn_salvar.setObjectName("PrimaryBtn")
-        btn_salvar.setCursor(Qt.CursorShape.PointingHandCursor)
-
-        def criar_nota():
-            t = ed_tit.text().strip()
-            if not t:
-                lbl_err.setText("Informe um título.")
-                lbl_err.setVisible(True)
-                return
-            qdt = ed_dp.date()
-            iso = date(qdt.year(), qdt.month(), qdt.day()).isoformat()
-            db.criar_anotacao(t, ed_desc.toPlainText().strip(), iso)
-            self.flash("Anotação salva.")
-            self.reconstruir_pagina()
-
-        btn_salvar.clicked.connect(criar_nota)
-        lay_f.addWidget(btn_salvar, alignment=Qt.AlignmentFlag.AlignLeft)
-        self.lay_pagina.addWidget(card_form)
-
-        notas = db.listar_anotacoes()
-        if notas.empty:
-            self.lay_pagina.addWidget(AlertBox("Nenhuma anotação cadastrada.", "info"))
-        else:
-            for r in notas.itertuples():
-                exp = ExpanderWidget(f"{bk.fmt_data(r.data)} — {r.titulo}")
-                lbl_d = QLabel(r.descricao or "—")
-                lbl_d.setWordWrap(True)
-                exp.corpo_layout.addWidget(lbl_d)
-                btn_del = QPushButton("Excluir anotação")
-                btn_del.setCursor(Qt.CursorShape.PointingHandCursor)
-                btn_del.clicked.connect(lambda _, id_=r.id: self._excluir_nota(id_))
-                exp.corpo_layout.addWidget(btn_del, alignment=Qt.AlignmentFlag.AlignLeft)
-                self.lay_pagina.addWidget(exp)
-
-    def _excluir_nota(self, id_: int):
-        db.excluir_anotacao(id_)
-        self.flash("Anotação excluída.")
-        self.reconstruir_pagina()
-
-    # ── PÁGINA 7: CONFIGURAÇÕES ──
+    # ── PÁGINA 6: CONFIGURAÇÕES ──
     def pagina_config(self):
         cfg = self.cfg
         v = self.vocab()
